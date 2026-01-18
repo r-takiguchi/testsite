@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>英語レベル診断 - 英会話教室</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- ランディング画面 -->
+    <div id="landing-screen" class="screen active">
+        <div class="container">
+            <!-- ヒーローセクション -->
+            <div class="landing-content">
+                <div class="icon-large">🎯</div>
+                <h1 class="main-title">あなたの英語レベル、わかりますか？</h1>
+                <p class="subtitle">4技能対応！無料レベル診断<br>リスニング・リーディング・スピーキング・ライティング<br>TOEIC・英検・CEFRレベルも判定</p>
+                
+                <div class="benefits">
+                    <div class="benefit-item">
+                        <span class="check-icon">✓</span>
+                        <span>無料</span>
+                    </div>
+                    <div class="benefit-item">
+                        <span class="check-icon">✓</span>
+                        <span>3分で完了</span>
+                    </div>
+                    <div class="benefit-item">
+                        <span class="check-icon">✓</span>
+                        <span>結果はすぐにわかる</span>
+                    </div>
+                </div>
+                
+                <button id="start-btn" class="btn-primary" onclick="document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById('method-screen').classList.add('active'); return false;">無料で診断する</button>
+                
+                <p class="reassurance">※間違えても大丈夫です<br>気軽に試してみてください</p>
+            </div>
+
+            <!-- 「喋れない」悩みへの共感セクション -->
+            <div class="empathy-section">
+                <h2 class="section-title">💬 「英語が喋れない」と感じていませんか？</h2>
+                <div class="empathy-list">
+                    <div class="empathy-item">✓ 間違えたら恥ずかしい...</div>
+                    <div class="empathy-item">✓ 完璧に話せないとダメだと思っている</div>
+                    <div class="empathy-item">✓ AIアプリを試したけど続かなかった</div>
+                    <div class="empathy-item">✓ 一人で続けるのがつらい</div>
+                </div>
+                <p class="empathy-message">「大丈夫です。あなただけじゃありません<br>対面レッスンなら、変わる理由があります」</p>
+                <button class="btn-secondary" onclick="document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById('method-screen').classList.add('active'); return false;">診断を始める</button>
+            </div>
+
+            <!-- AIアプリで続かなかった人へのメッセージ -->
+            <div class="ai-app-section">
+                <h2 class="section-title">🤖 AIアプリで続かなかったあなたへ</h2>
+                <p class="section-intro">AIアプリも良いツールです。<br>でも、続かない理由がある...</p>
+                
+                <div class="comparison-grid">
+                    <div class="comparison-item negative">
+                        <h3>【AIアプリの限界】</h3>
+                        <ul>
+                            <li>❌ 一人で続けるのがつらい</li>
+                            <li>❌ モチベーションが上がらない</li>
+                            <li>❌ AIのフィードバックが物足りない</li>
+                        </ul>
+                    </div>
+                    <div class="comparison-item positive">
+                        <h3>【対面レッスンの価値】</h3>
+                        <ul>
+                            <li>✅ 仲間と一緒に学べる</li>
+                            <li>✅ モチベーションが維持できる</li>
+                            <li>✅ リアルな反応で成長を実感</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <p class="comparison-message">「対面レッスンなら、<br>あなたの続かなかった理由を解決できます」</p>
+                <button class="btn-secondary" onclick="document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById('method-screen').classList.add('active'); return false;">診断を始める</button>
+            </div>
+
+            <!-- 成功ストーリー -->
+            <div class="success-story-section">
+                <h2 class="section-title">📖 受講生の声</h2>
+                <div class="story-card">
+                    <div class="story-before">
+                        <h3>【Before】</h3>
+                        <p>「AIアプリを3つ試しましたが、<br>どれも続きませんでした。<br>一人で続けるのがつらくて...」</p>
+                    </div>
+                    <div class="story-arrow">↓ 3ヶ月後</div>
+                    <div class="story-after">
+                        <h3>【After】</h3>
+                        <p>「対面レッスンに通い始めて、<br>3ヶ月で話せるようになりました！<br>仲間と一緒だから続けられて、<br>講師のリアルな反応で成長を実感！」</p>
+                        <p class="story-author">- 30代・会社員・女性</p>
+                    </div>
+                </div>
+                <button class="btn-secondary" onclick="document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById('method-screen').classList.add('active'); return false;">診断を始める</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 診断方法選択画面（新規追加） -->
+    <div id="method-screen" class="screen">
+        <div class="container">
+            <h2 class="screen-title">📋 診断方法を選んでください</h2>
+            
+            <div class="method-options">
+                <div class="method-card" id="level-select-method">
+                    <div class="method-icon">🎯</div>
+                    <h3>レベルを選んで診断</h3>
+                    <div class="method-benefits">
+                        <div>✅ 自分のレベルがわかる</div>
+                        <div>✅ 無理なく始められる</div>
+                        <div>✅ 短時間で完了</div>
+                    </div>
+                    <div class="method-details">
+                        <p>初級: 5問（3-5分）</p>
+                        <p>中級: 10問（8-10分）</p>
+                        <p>上級: 20問（15-20分）</p>
+                    </div>
+                    <button class="btn-primary method-btn" onclick="selectedMethod = 'level-select'; document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById('level-select-screen').classList.add('active'); return false;">レベルを選んで始める</button>
+                </div>
+                
+                <div class="method-card" id="auto-method">
+                    <div class="method-icon">🌟</div>
+                    <h3>自動判定で診断</h3>
+                    <div class="method-benefits">
+                        <div>✅ 総合的なレベル判定</div>
+                        <div>✅ TOEIC・英検レベル表示</div>
+                        <div>✅ 4技能すべてチェック</div>
+                    </div>
+                    <div class="method-details">
+                        <p>20問（15-20分）</p>
+                        <p>4技能×5問</p>
+                    </div>
+                    <button class="btn-primary method-btn" onclick="selectedMethod = 'auto'; selectedLevel = null; document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById('purpose-screen').classList.add('active'); return false;">自動判定で始める</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- レベル選択画面（新規追加） -->
+    <div id="level-select-screen" class="screen">
+        <div class="container">
+            <h2 class="screen-title">🌱 あなたのレベルを選んでください</h2>
+            <p class="screen-subtitle">※わからない場合は「自動判定」に戻ることができます</p>
+            
+            <div class="level-options">
+                <div class="level-card" data-level="beginner" onclick="selectedLevel = 'beginner'; document.querySelectorAll('.level-card').forEach(c => c.classList.remove('selected')); this.classList.add('selected'); setTimeout(function(){ document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById('purpose-screen').classList.add('active'); }, 300); return false;">
+                    <div class="level-icon">🌱</div>
+                    <h3>初級</h3>
+                    <div class="level-description">
+                        <p>・簡単な挨拶</p>
+                        <p>・基本単語</p>
+                    </div>
+                    <div class="level-info">5問 / 3-5分</div>
+                </div>
+                
+                <div class="level-card" data-level="intermediate" onclick="selectedLevel = 'intermediate'; document.querySelectorAll('.level-card').forEach(c => c.classList.remove('selected')); this.classList.add('selected'); setTimeout(function(){ document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById('purpose-screen').classList.add('active'); }, 300); return false;">
+                    <div class="level-icon">🌿</div>
+                    <h3>中級</h3>
+                    <div class="level-description">
+                        <p>・日常会話レベル</p>
+                        <p>・ビジネス基礎</p>
+                    </div>
+                    <div class="level-info">10問 / 8-10分</div>
+                </div>
+                
+                <div class="level-card" data-level="advanced" onclick="selectedLevel = 'advanced'; document.querySelectorAll('.level-card').forEach(c => c.classList.remove('selected')); this.classList.add('selected'); setTimeout(function(){ document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById('purpose-screen').classList.add('active'); }, 300); return false;">
+                    <div class="level-icon">🌳</div>
+                    <h3>上級</h3>
+                    <div class="level-description">
+                        <p>・ビジネス上級</p>
+                        <p>・専門的</p>
+                    </div>
+                    <div class="level-info">20問 / 15-20分</div>
+                </div>
+            </div>
+            
+            <button id="level-back-btn" class="btn-secondary" onclick="document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById('method-screen').classList.add('active'); return false;">⬅️ 診断方法選択に戻る</button>
+        </div>
+    </div>
+
+    <!-- 用途選択画面（拡張） -->
+    <div id="purpose-screen" class="screen">
+        <div class="container">
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: 33%"></div>
+            </div>
+            <div class="step-indicator">ステップ 1/3</div>
+            
+            <h2 class="screen-title">🎯 あなたの英語の目標は？</h2>
+            <p class="screen-subtitle">（複数選択OK）</p>
+            
+            <div class="purpose-categories">
+                <div class="purpose-category">
+                    <h3 class="category-title">【趣味・留学・海外生活】</h3>
+                    <div class="purpose-options">
+                        <div class="purpose-card" data-purpose="travel">
+                            <div class="purpose-icon">✈️</div>
+                            <div class="purpose-text">海外旅行を<br>もっと楽しみたい</div>
+                            <div class="check-mark">✓</div>
+                        </div>
+                        <div class="purpose-card" data-purpose="study-abroad">
+                            <div class="purpose-icon">🌍</div>
+                            <div class="purpose-text">留学<br>したい</div>
+                            <div class="check-mark">✓</div>
+                        </div>
+                        <div class="purpose-card" data-purpose="daily">
+                            <div class="purpose-icon">💬</div>
+                            <div class="purpose-text">とにかく<br>話せるようになりたい</div>
+                            <div class="check-mark">✓</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="purpose-category">
+                    <h3 class="category-title">【仕事で必要な英語力】</h3>
+                    <div class="purpose-options">
+                        <div class="purpose-card" data-purpose="business">
+                            <div class="purpose-icon">💼</div>
+                            <div class="purpose-text">海外出張や<br>赴任に備えて</div>
+                            <div class="check-mark">✓</div>
+                        </div>
+                        <div class="purpose-card" data-purpose="presentation">
+                            <div class="purpose-icon">🎤</div>
+                            <div class="purpose-text">プレゼン・スピーチ<br>のテクニック</div>
+                            <div class="check-mark">✓</div>
+                        </div>
+                        <div class="purpose-card" data-purpose="meeting">
+                            <div class="purpose-icon">📊</div>
+                            <div class="purpose-text">会議で必要な<br>ディスカッション力</div>
+                            <div class="check-mark">✓</div>
+                        </div>
+                        <div class="purpose-card" data-purpose="career">
+                            <div class="purpose-icon">🚀</div>
+                            <div class="purpose-text">転職・<br>キャリアアップ</div>
+                            <div class="check-mark">✓</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="purpose-category">
+                    <h3 class="category-title">【資格を取得したい】</h3>
+                    <div class="purpose-options">
+                        <div class="purpose-card" data-purpose="toeic">
+                            <div class="purpose-icon">📝</div>
+                            <div class="purpose-text">TOEIC<br>スコアアップ</div>
+                            <div class="check-mark">✓</div>
+                        </div>
+                        <div class="purpose-card" data-purpose="eiken">
+                            <div class="purpose-icon">🏆</div>
+                            <div class="purpose-text">英検<br>に合格したい</div>
+                            <div class="check-mark">✓</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="purpose-category">
+                    <h3 class="category-title">【その他】</h3>
+                    <div class="purpose-options">
+                        <div class="purpose-card" data-purpose="ai-app-failed">
+                            <div class="purpose-icon">🤖</div>
+                            <div class="purpose-text">AIアプリを試したけど<br>続かなかった</div>
+                            <div class="check-mark">✓</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <button id="purpose-next-btn" class="btn-primary" disabled>次へ</button>
+        </div>
+    </div>
+
+    <!-- レベル診断画面 -->
+    <div id="quiz-screen" class="screen">
+        <div class="container">
+            <div class="progress-bar">
+                <div class="progress-fill" id="quiz-progress"></div>
+            </div>
+            <div class="step-indicator">
+                <span id="quiz-step">ステップ 2/3</span>
+                <span id="question-number">問題 1/20</span>
+            </div>
+            
+            <div class="question-container">
+                <div id="question-text"></div>
+                
+                <div class="options-container" id="options-container"></div>
+                
+                <button class="btn-skip" id="skip-btn">わからない</button>
+            </div>
+            
+            <button id="quiz-next-btn" class="btn-primary" disabled>次へ</button>
+        </div>
+    </div>
+
+    <!-- 診断結果画面 -->
+    <div id="result-screen" class="screen">
+        <div class="container">
+            <div class="result-header">
+                <div class="celebration">🎉</div>
+                <h2 class="result-title">診断完了！</h2>
+            </div>
+            
+            <div class="result-card">
+                <div class="level-display">
+                    <h3>あなたのレベル</h3>
+                    <div class="stars" id="stars-display"></div>
+                    <div class="level-text">
+                        <span id="level-japanese"></span>
+                        <span class="level-english" id="level-english"></span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="course-recommendation">
+                <h3>あなたにぴったりのコース</h3>
+                <div class="course-card">
+                    <div class="course-icon" id="course-icon">📚</div>
+                    <div class="course-name" id="course-name"></div>
+                    <div class="course-level" id="course-level"></div>
+                </div>
+            </div>
+            
+            <div class="benefits-list">
+                <h4>このコースでできるようになること:</h4>
+                <ul id="benefits-list"></ul>
+            </div>
+            
+            <div class="result-id-section">
+                <p class="result-id-label">診断結果ID:</p>
+                <div class="result-id-display">
+                    <span id="result-id">ABC123</span>
+                    <button class="btn-copy" id="copy-btn">コピー</button>
+                </div>
+                <p class="result-id-note">来校時にこのIDを提示してください</p>
+            </div>
+            
+            <!-- 無料体験レッスン・カウンセリングへのCTA（新規追加） -->
+            <div class="cta-section">
+                <h3 class="cta-title">🎁 無料体験レッスン・カウンセリング</h3>
+                <p class="cta-description">診断結果をもとに、<br>あなたにぴったりのコースを提案します</p>
+                <div class="cta-benefits">
+                    <div>✅ 無料体験レッスン（40分）</div>
+                    <div>✅ 無料カウンセリング（30分）</div>
+                    <div>✅ 診断結果をもとに最適なコースを提案</div>
+                </div>
+                <div class="cta-buttons">
+                    <button id="trial-lesson-btn" class="btn-primary btn-large">無料体験レッスンを予約する</button>
+                    <button id="counseling-btn" class="btn-primary btn-large">無料カウンセリングを予約する</button>
+                </div>
+            </div>
+
+            <button id="contact-btn" class="btn-primary">問い合わせる</button>
+            <button id="email-btn" class="btn-secondary">結果をメールで送信</button>
+        </div>
+    </div>
+
+    <!-- 問い合わせフォーム画面 -->
+    <div id="contact-screen" class="screen">
+        <div class="container">
+            <h2 class="screen-title">お問い合わせ</h2>
+            
+            <form id="contact-form" class="contact-form">
+                <div class="form-group">
+                    <label for="result-id-input">診断結果ID</label>
+                    <input type="text" id="result-id-input" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label for="name">お名前 <span class="required">*</span></label>
+                    <input type="text" id="name" required>
+                    <span class="error-message" id="name-error"></span>
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">メールアドレス <span class="required">*</span></label>
+                    <input type="email" id="email" required>
+                    <span class="error-message" id="email-error"></span>
+                </div>
+                
+                <div class="form-group">
+                    <label for="phone">電話番号 <span class="required">*</span></label>
+                    <input type="tel" id="phone" required>
+                    <span class="error-message" id="phone-error"></span>
+                </div>
+                
+                <div class="form-group">
+                    <label for="contact-method">希望連絡方法</label>
+                    <select id="contact-method">
+                        <option value="email">メール</option>
+                        <option value="phone">電話</option>
+                        <option value="line">LINE</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="inquiry-type">問い合わせ内容</label>
+                    <select id="inquiry-type">
+                        <option value="result">診断結果について詳しく知りたい</option>
+                        <option value="course">コースについて相談したい</option>
+                        <option value="trial-lesson">無料体験レッスンを予約したい</option>
+                        <option value="counseling">無料カウンセリングを予約したい</option>
+                        <option value="visit">来校予約をしたい</option>
+                        <option value="other">その他</option>
+                    </select>
+                </div>
+                
+                <button type="submit" class="btn-primary" id="submit-btn">送信する</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 送信完了画面 -->
+    <div id="complete-screen" class="screen">
+        <div class="container">
+            <div class="complete-content">
+                <div class="success-icon">✓</div>
+                <h2 class="complete-title">送信完了</h2>
+                <p class="complete-message">
+                    お問い合わせありがとうございます。<br>
+                    スタッフから連絡させていただきます。
+                </p>
+                <button id="home-btn" class="btn-primary">ホームに戻る</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // グローバル変数を先に定義（インラインイベントハンドラーで使用するため）
+        var selectedMethod = null;
+        var selectedLevel = null;
+        window.selectedPurposes = [];
+    </script>
+    <script src="script.js"></script>
+    <script>
+        // デバッグ用: ページ読み込み確認
+        window.addEventListener('load', function() {
+            console.log('ページ読み込み完了');
+            const startBtn = document.getElementById('start-btn');
+            if (startBtn) {
+                console.log('start-btnが見つかりました');
+            } else {
+                console.error('start-btnが見つかりません');
+            }
+        });
+    </script>
+</body>
+</html>
+
