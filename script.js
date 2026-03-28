@@ -1,1551 +1,1294 @@
-// グローバル変数
-// selectedPurposesはindex.htmlで定義されているが、念のため参照を確認
-if (typeof selectedPurposes === 'undefined') {
-    window.selectedPurposes = [];
-}
-let currentSkillIndex = 0; // 現在の技能（0: リスニング, 1: リーディング, 2: スピーキング, 3: ライティング）
-let currentQuestionIndex = 0;
-let skillAnswers = {
-    listening: [],
-    reading: [],
-    speaking: [],
-    writing: []
-};
-let resultData = null;
-let diagnosisQuestions = null; // 診断方法に応じた問題セット
-let diagnosisSkills = []; // 診断方法に応じた技能リスト
+/* ============================================================
+   EigoPlus — Level Diagnostic Script
+   All event handling here. No inline onclick in HTML.
+   ============================================================ */
 
-// 技能名
-const skills = [
-    { id: 'listening', name: 'リスニング', icon: '🎧' },
-    { id: 'reading', name: 'リーディング', icon: '📖' },
-    { id: 'speaking', name: 'スピーキング', icon: '🗣️' },
-    { id: 'writing', name: 'ライティング', icon: '✍️' }
+'use strict';
+
+/* ----------------------------------------------------------
+   STATE
+   ---------------------------------------------------------- */
+const state = {
+  method: null,       // 'auto' | 'level-select'
+  level:  null,       // 'beginner' | 'intermediate' | 'advanced'
+  goals:  new Set(),  // Set of goal strings
+  questions: [],      // flat array of question objects for current quiz
+  currentQ:  0,       // current question index
+  answers:   [],      // parallel array: { skillId, correct, score }
+  resultId:  null
+};
+
+/* ----------------------------------------------------------
+   QUESTIONS DATA
+   ---------------------------------------------------------- */
+const allQuestions = {
+  listening: [
+    {
+      skill: 'listening',
+      instruction: 'リスニング：音声を聞いて答えてください',
+      audioText: 'Hello! My name is Sarah. I work at a coffee shop near the station.',
+      question: '音声の内容と合っているものはどれですか？',
+      options: [
+        { text: 'Sarah は駅の近くのコーヒーショップで働いている', correct: true,  score: 1 },
+        { text: 'Sarah は学校の先生である',                      correct: false, score: 0 },
+        { text: 'Sarah は病院で働いている',                      correct: false, score: 0 },
+        { text: 'Sarah はスーパーマーケットに住んでいる',         correct: false, score: 0 }
+      ]
+    },
+    {
+      skill: 'listening',
+      instruction: 'リスニング：音声を聞いて答えてください',
+      audioText: 'The meeting will start at 3 PM in the conference room on the second floor. Please bring your reports.',
+      question: '会議について正しい情報はどれですか？',
+      options: [
+        { text: '会議は午後3時に2階の会議室で始まる',             correct: true,  score: 1 },
+        { text: '会議は午前10時に始まる',                        correct: false, score: 0 },
+        { text: '会議はオンラインで行われる',                    correct: false, score: 0 },
+        { text: '会議にはレポートの持参は不要',                  correct: false, score: 0 }
+      ]
+    },
+    {
+      skill: 'listening',
+      instruction: 'リスニング：音声を聞いて答えてください',
+      audioText: 'I would like to book a table for two people at 7 PM this Friday. Do you have any availability?',
+      question: '話者が求めているものは何ですか？',
+      options: [
+        { text: '今週金曜日の午後7時に2人分のテーブルの予約',    correct: true,  score: 1 },
+        { text: '2人部屋のホテルの予約',                         correct: false, score: 0 },
+        { text: '7時のフライトチケット',                         correct: false, score: 0 },
+        { text: '2名分の映画チケット',                           correct: false, score: 0 }
+      ]
+    },
+    {
+      skill: 'listening',
+      instruction: 'リスニング：音声を聞いて答えてください',
+      audioText: 'Due to the heavy rain, the outdoor event scheduled for this weekend has been postponed to the following Saturday. We apologize for any inconvenience.',
+      question: 'なぜイベントが変更されましたか？',
+      options: [
+        { text: '大雨のため屋外イベントが延期された',            correct: true,  score: 1 },
+        { text: '台風のためイベントが中止された',                correct: false, score: 0 },
+        { text: '会場の工事のため移動になった',                  correct: false, score: 0 },
+        { text: '参加者が集まらなかったため',                    correct: false, score: 0 }
+      ]
+    },
+    {
+      skill: 'listening',
+      instruction: 'リスニング：音声を聞いて答えてください',
+      audioText: 'Our quarterly earnings exceeded projections by 12 percent, driven largely by strong performance in the Asia-Pacific region and a successful product launch in Q3.',
+      question: '業績報告で述べられている内容として正しいものはどれですか？',
+      options: [
+        { text: '四半期利益は予測を12%上回り、アジア太平洋地域が牽引した',  correct: true,  score: 1 },
+        { text: '四半期利益は予測を下回り、製品発売に失敗した',             correct: false, score: 0 },
+        { text: 'アジア太平洋地域の業績は低調だった',                       correct: false, score: 0 },
+        { text: '第2四半期の新製品が業績を牽引した',                        correct: false, score: 0 }
+      ]
+    }
+  ],
+
+  reading: [
+    {
+      skill: 'reading',
+      instruction: 'リーディング：文章を読んで答えてください',
+      passage: 'Tom has a dog named Max. Max loves to play in the park every morning.',
+      question: 'Max について正しいことはどれですか？',
+      options: [
+        { text: 'Max は毎朝公園で遊ぶのが好き',                  correct: true,  score: 1 },
+        { text: 'Max は猫である',                               correct: false, score: 0 },
+        { text: 'Max は夜だけ散歩する',                          correct: false, score: 0 },
+        { text: 'Max は家の中でしか遊ばない',                    correct: false, score: 0 }
+      ]
+    },
+    {
+      skill: 'reading',
+      instruction: 'リーディング：文章を読んで答えてください',
+      passage: 'The store opens at 9 AM and closes at 8 PM on weekdays. On weekends, it opens one hour later and closes at the same time.',
+      question: '週末の開店時間は何時ですか？',
+      options: [
+        { text: '午前10時',   correct: true,  score: 1 },
+        { text: '午前9時',    correct: false, score: 0 },
+        { text: '午前8時',    correct: false, score: 0 },
+        { text: '午後8時',    correct: false, score: 0 }
+      ]
+    },
+    {
+      skill: 'reading',
+      instruction: 'リーディング：文章を読んで答えてください',
+      passage: 'Despite the challenging economic climate, the company managed to maintain profitability by streamlining operations and expanding into new markets in Southeast Asia.',
+      question: '企業が利益を維持した主な方法は何ですか？',
+      options: [
+        { text: '業務の効率化と東南アジアの新市場への参入',       correct: true,  score: 1 },
+        { text: '国内市場のみへの集中投資',                      correct: false, score: 0 },
+        { text: '従業員数の大幅な増加',                          correct: false, score: 0 },
+        { text: '製品価格の大幅な値上げ',                        correct: false, score: 0 }
+      ]
+    },
+    {
+      skill: 'reading',
+      instruction: 'リーディング：文章を読んで答えてください',
+      passage: 'The annual performance review process has been revised to incorporate 360-degree feedback, allowing employees to receive input from peers, subordinates, and supervisors alike.',
+      question: '年次評価プロセスの変更点は何ですか？',
+      options: [
+        { text: '360度フィードバックが導入され、同僚・部下・上司から評価を受ける', correct: true,  score: 1 },
+        { text: '評価が年2回から年1回に変更された',                                correct: false, score: 0 },
+        { text: '自己評価のみが採用されるようになった',                            correct: false, score: 0 },
+        { text: '外部コンサルタントによる評価に切り替わった',                      correct: false, score: 0 }
+      ]
+    },
+    {
+      skill: 'reading',
+      instruction: 'リーディング：文章を読んで答えてください',
+      passage: 'The proliferation of remote work has fundamentally altered workforce dynamics, compelling organizations to reexamine their talent acquisition strategies and invest heavily in digital collaboration infrastructure to sustain productivity and employee engagement.',
+      question: 'リモートワークの普及によって企業が取り組んでいることとして最も適切なものは？',
+      options: [
+        { text: '人材採用戦略の見直しとデジタル協業インフラへの投資',             correct: true,  score: 1 },
+        { text: 'オフィスの物理的な拡張と従来の採用方法の強化',                   correct: false, score: 0 },
+        { text: 'リモートワーク廃止と全員のオフィス復帰方針',                     correct: false, score: 0 },
+        { text: 'フリーランサーへの業務委託の全面廃止',                           correct: false, score: 0 }
+      ]
+    }
+  ],
+
+  speaking: [
+    {
+      skill: 'speaking',
+      instruction: 'スピーキング：場面に合った表現を選んでください',
+      scenario: '初めて会った人に自己紹介をしています。',
+      question: '「はじめまして。田中と申します。」を英語で言うと？',
+      options: [
+        { text: 'Nice to meet you. My name is Tanaka.',          correct: true,  score: 1 },
+        { text: 'Good to see you again, Tanaka.',                correct: false, score: 0 },
+        { text: 'I am called Tanaka, good bye.',                 correct: false, score: 0 },
+        { text: 'How do you do, I am Tanaka-san.',               correct: false, score: 0 }
+      ]
+    },
+    {
+      skill: 'speaking',
+      instruction: 'スピーキング：場面に合った表現を選んでください',
+      scenario: 'ビジネスミーティングで、提案に同意したいと思っています。',
+      question: '「その提案に賛成します。」を表す最も自然な表現は？',
+      options: [
+        { text: 'I agree with that proposal.',                   correct: true,  score: 1 },
+        { text: 'That proposal is very good for me.',            correct: false, score: 0 },
+        { text: 'I like your saying very much.',                 correct: false, score: 0 },
+        { text: 'Please do the proposal.',                       correct: false, score: 0 }
+      ]
+    },
+    {
+      skill: 'speaking',
+      instruction: 'スピーキング：場面に合った表現を選んでください',
+      scenario: 'プレゼンテーションの途中で、次のスライドに移る際の一言。',
+      question: '「では、次のポイントに移ります。」の最も自然な表現は？',
+      options: [
+        { text: "Moving on to the next point…",                  correct: true,  score: 1 },
+        { text: 'We are now going the next.',                    correct: false, score: 0 },
+        { text: 'Please look at the next slide now please.',     correct: false, score: 0 },
+        { text: 'Finish this, start next topic.',                correct: false, score: 0 }
+      ]
+    },
+    {
+      skill: 'speaking',
+      instruction: 'スピーキング：場面に合った表現を選んでください',
+      scenario: '上司に急な仕事が入り、約束していたランチを断る必要があります。',
+      question: '最も丁寧で適切な断り方はどれですか？',
+      options: [
+        { text: "I'm afraid I have to cancel our lunch. Something urgent has come up. Could we reschedule?", correct: true,  score: 1 },
+        { text: 'I cannot come to lunch. I am busy today.',                                                   correct: false, score: 0 },
+        { text: 'Sorry, I forget our lunch meeting today.',                                                   correct: false, score: 0 },
+        { text: 'Lunch is no good. I have work.',                                                             correct: false, score: 0 }
+      ]
+    },
+    {
+      skill: 'speaking',
+      instruction: 'スピーキング：場面に合った表現を選んでください',
+      scenario: '国際会議で、相手の発言の意図を明確にしたいと思っています。',
+      question: '「それはつまり、〜ということでしょうか？」を最も自然に表現するとしたら？',
+      options: [
+        { text: "If I understand you correctly, you're suggesting that…?",                                   correct: true,  score: 1 },
+        { text: 'What are you meaning by that thing you said?',                                              correct: false, score: 0 },
+        { text: 'Please say your point again more clearly.',                                                 correct: false, score: 0 },
+        { text: 'I don\'t understand. What do you want to say?',                                             correct: false, score: 0 }
+      ]
+    }
+  ],
+
+  writing: [
+    {
+      skill: 'writing',
+      instruction: 'ライティング：正しい英文を選んでください',
+      question: '「私は毎日英語を勉強しています。」の正しい英文は？',
+      options: [
+        { text: 'I study English every day.',                    correct: true,  score: 1 },
+        { text: 'I am studying English every days.',             correct: false, score: 0 },
+        { text: 'I studies English everyday.',                   correct: false, score: 0 },
+        { text: 'Every day I am study English.',                 correct: false, score: 0 }
+      ]
+    },
+    {
+      skill: 'writing',
+      instruction: 'ライティング：正しい英文を選んでください',
+      question: '「もし明日晴れなら、私たちはピクニックに行きます。」の正しい英文は？',
+      options: [
+        { text: 'If it is sunny tomorrow, we will go on a picnic.',       correct: true,  score: 1 },
+        { text: 'If it will be sunny tomorrow, we will go on a picnic.',  correct: false, score: 0 },
+        { text: 'If it is sunny tomorrow, we would go on a picnic.',      correct: false, score: 0 },
+        { text: 'When it will be sunny tomorrow, we will picnic.',         correct: false, score: 0 }
+      ]
+    },
+    {
+      skill: 'writing',
+      instruction: 'ライティング：正しい英文を選んでください',
+      question: 'ビジネスメールで「ご確認いただけますでしょうか」と依頼する最も適切な表現は？',
+      options: [
+        { text: 'Could you please review the attached document?',         correct: true,  score: 1 },
+        { text: 'Please you check the document that is attached.',        correct: false, score: 0 },
+        { text: 'Can you look the attached document for me please?',      correct: false, score: 0 },
+        { text: 'I want you to confirm the document we attached.',        correct: false, score: 0 }
+      ]
+    },
+    {
+      skill: 'writing',
+      instruction: 'ライティング：正しい英文を選んでください',
+      original: 'その会議は2時間以上続いた結果、最終的に合意に達することができた。',
+      question: '上記の文として最も適切な英訳はどれですか？',
+      options: [
+        { text: 'After lasting more than two hours, the meeting finally reached a consensus.',       correct: true,  score: 1 },
+        { text: 'The meeting was lasted for more than two hours and reached a final consensus.',     correct: false, score: 0 },
+        { text: 'The meeting continued over two hours, we could reached the consensus at last.',    correct: false, score: 0 },
+        { text: 'Over two hours the meeting has lasted and consensus has been reached finally.',    correct: false, score: 0 }
+      ]
+    },
+    {
+      skill: 'writing',
+      instruction: 'ライティング：正しい英文を選んでください',
+      original: '規制の変更は、サプライチェーンの効率性に重大な影響を与えるとともに、中小企業にとってはコンプライアンス上の課題をもたらす可能性がある。',
+      question: '上記の文として最も適切な英訳はどれですか？',
+      options: [
+        { text: 'The regulatory changes could significantly impact supply chain efficiency and pose compliance challenges for small and medium-sized enterprises.', correct: true,  score: 1 },
+        { text: 'Regulation change will give big impact to supply chain efficiency and small companies may have compliance problems.',                            correct: false, score: 0 },
+        { text: 'The changes of regulation impacts supply chains seriously and small businesses have compliance challenge.',                                     correct: false, score: 0 },
+        { text: 'Due to regulatory changing, supply chain will be impacted and SMEs face compliance issue.',                                                    correct: false, score: 0 }
+      ]
+    }
+  ]
+};
+
+/* ----------------------------------------------------------
+   COURSE DATA
+   ---------------------------------------------------------- */
+const courseData = {
+  travel: {
+    name: '旅行英語コース',
+    icon: 'flight',
+    tag: '旅行・観光',
+    desc: '海外旅行で困らない実践英語を習得。空港・ホテル・レストラン・観光など、シーン別フレーズを中心に学びます。'
+  },
+  business: {
+    name: 'ビジネス英語コース',
+    icon: 'business_center',
+    tag: 'ビジネス',
+    desc: 'メール・電話・会議・プレゼンなど、実務で使えるビジネス英語を集中特訓。昇進・転職にも直結します。'
+  },
+  daily: {
+    name: '日常英会話コース',
+    icon: 'chat',
+    tag: '日常会話',
+    desc: '日常のあらゆる場面で自然に英語が使えるようになるコース。フリートーキングと文法の両輪で力をつけます。'
+  },
+  'study-abroad': {
+    name: '留学準備コース',
+    icon: 'public',
+    tag: '留学',
+    desc: '留学・海外大学進学に向けたアカデミック英語を習得。エッセイライティング・リスニング強化も対応。'
+  },
+  presentation: {
+    name: 'プレゼン英語コース',
+    icon: 'mic',
+    tag: 'プレゼン',
+    desc: '英語でのプレゼンテーション・スピーチスキルを磨きます。構成・話し方・Q&A対応まで一貫指導。'
+  },
+  meeting: {
+    name: 'ビジネス英語コース',
+    icon: 'groups',
+    tag: '会議・交渉',
+    desc: '国際会議・交渉・ネゴシエーションに特化した実践コース。即座に意見を伝える力を養います。'
+  },
+  career: {
+    name: 'キャリアアップ英語コース',
+    icon: 'trending_up',
+    tag: 'キャリア',
+    desc: '転職・昇進・グローバルキャリアを目指す方向け。英文履歴書・面接対策・ビジネス英語を網羅します。'
+  },
+  toeic: {
+    name: 'TOEIC対策コース',
+    icon: 'assignment',
+    tag: 'TOEIC',
+    desc: '短期集中でTOEICスコアアップを狙うコース。リスニング・リーディング両パートを体系的に対策します。'
+  },
+  eiken: {
+    name: '英検対策コース',
+    icon: 'school',
+    tag: '英検',
+    desc: '英検2級〜1級の取得を目指す専門コース。一次試験（読む・聞く・書く）から二次面接まで完全対応。'
+  },
+  'ai-app-failed': {
+    name: '対面英会話スタートコース',
+    icon: 'people',
+    tag: '対面・マンツーマン',
+    desc: 'アプリや独学で挫折した方に最適。プロ講師との対話で確実にステップアップできる環境をご用意します。'
+  },
+  other: {
+    name: '総合英語コース',
+    icon: 'auto_awesome',
+    tag: 'バランス学習',
+    desc: '4技能をバランスよく伸ばす標準コース。目標・レベルに合わせて柔軟にカリキュラムをカスタマイズします。'
+  }
+};
+
+/* ----------------------------------------------------------
+   UTILITY FUNCTIONS
+   ---------------------------------------------------------- */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(function(s) {
+    s.classList.remove('active');
+  });
+  const target = document.getElementById(id);
+  if (target) {
+    target.classList.add('active');
+  }
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+function generateResultId() {
+  const now = new Date();
+  const y   = now.getFullYear();
+  const m   = String(now.getMonth() + 1).padStart(2, '0');
+  const d   = String(now.getDate()).padStart(2, '0');
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let rand = '';
+  for (let i = 0; i < 6; i++) {
+    rand += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return 'LVL-' + y + m + d + '-' + rand;
+}
+
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+  }
+  return a;
+}
+
+function calcToeic(listeningCorrect, readingCorrect, maxPerSkill) {
+  const ls = Math.round((listeningCorrect / maxPerSkill) * 495);
+  const rs = Math.round((readingCorrect  / maxPerSkill) * 495);
+  return ls + rs;
+}
+
+function toeicToEiken(toeic) {
+  if (toeic >= 900) return '1級';
+  if (toeic >= 800) return '準1級';
+  if (toeic >= 650) return '2級';
+  if (toeic >= 500) return '準2級';
+  if (toeic >= 350) return '3級';
+  if (toeic >= 250) return '4級';
+  return '5級';
+}
+
+function toeicToCefr(toeic) {
+  if (toeic >= 945) return 'C2';
+  if (toeic >= 785) return 'C1';
+  if (toeic >= 550) return 'B2';
+  if (toeic >= 225) return 'B1';
+  if (toeic >= 120) return 'A2';
+  return 'A1';
+}
+
+function starsFor(level) {
+  const map = {
+    '入門':       '★☆☆☆☆',
+    '初級':       '★★☆☆☆',
+    '初級〜中級': '★★★☆☆',
+    '中級':       '★★★☆☆',
+    '中級〜上級': '★★★★☆',
+    '上級':       '★★★★★'
+  };
+  return map[level] || '★★★☆☆';
+}
+
+function levelToEnglish(level) {
+  const map = {
+    '入門':       'Beginner',
+    '初級':       'Elementary',
+    '初級〜中級': 'Pre-Intermediate',
+    '中級':       'Intermediate',
+    '中級〜上級': 'Upper-Intermediate',
+    '上級':       'Advanced'
+  };
+  return map[level] || 'Intermediate';
+}
+
+function motivationalMessage(level) {
+  const map = {
+    '入門':       'これからスタート！基礎から丁寧にサポートします。焦らず一歩ずつ確実に英語力を積み上げましょう。',
+    '初級':       '日常の挨拶や簡単な表現はバッチリ。次のステップで会話の幅を一気に広げましょう！',
+    '初級〜中級': '土台がしっかりついています。あともう一押しで中級の壁を突破できます！',
+    '中級':       '日常会話に自信あり。ビジネスや専門的な場面でも通用する力を一緒に伸ばしましょう。',
+    '中級〜上級': '高い英語力をお持ちです！より洗練された表現やニュアンスを磨いて、上級者へ進化しましょう。',
+    '上級':       'すばらしい英語力です！ネイティブレベルの自然な表現や専門的なコミュニケーションを極めましょう。'
+  };
+  return map[level] || 'あなたの目標に向けて、一緒に取り組みましょう！';
+}
+
+function skillAdvice(scores) {
+  const advice = [];
+  const skillNames = { listening: 'リスニング', reading: 'リーディング', speaking: 'スピーキング', writing: 'ライティング' };
+  const skillAdviceMap = {
+    listening: '英語のリズムや音に慣れるため、毎日短時間でも英語音声を聴く習慣をつけましょう。ニュースポッドキャストやドラマが効果的です。',
+    reading:   '語彙力と速読力を上げるために、英語の記事や本を読む練習をしましょう。わからない単語はメモして覚える習慣をつけましょう。',
+    speaking:  '口に出す練習が鍵です。独り言を英語でつぶやく「シャドーイング」を毎日試しましょう。間違いを恐れずに声に出すことが大切です。',
+    writing:   '基本的な文法ルールを確認し、短い英文を毎日書く練習をしましょう。日記を英語で書くのも非常に効果的です。'
+  };
+  const MAX_PER_SKILL = 5;
+
+  Object.keys(scores).forEach(function(skill) {
+    const ratio = scores[skill] / MAX_PER_SKILL;
+    if (ratio < 0.6) {
+      advice.push({ skill: skillNames[skill], text: skillAdviceMap[skill] });
+    }
+  });
+
+  if (advice.length === 0) {
+    advice.push({ skill: '全技能', text: '非常に高い英語力をお持ちです。さらに上を目指して、ネイティブとのディスカッションや専門的なライティングに挑戦しましょう。' });
+  }
+
+  return advice;
+}
+
+function getRecommendedCourse(goals) {
+  const priority = ['business', 'meeting', 'presentation', 'career', 'toeic', 'eiken', 'study-abroad', 'travel', 'daily', 'ai-app-failed'];
+  for (let i = 0; i < priority.length; i++) {
+    if (goals.has(priority[i])) {
+      return courseData[priority[i]];
+    }
+  }
+  return courseData['other'];
+}
+
+/* ----------------------------------------------------------
+   AUDIO PLAYBACK (Web Speech API — best-voice selection)
+   ---------------------------------------------------------- */
+
+// 優先順位付き音声リスト（品質の高い順）
+const PREFERRED_VOICES = [
+  // Microsoft Edge ニューラル音声（最高品質）
+  'Microsoft Aria Online (Natural) - English (United States)',
+  'Microsoft Jenny Online (Natural) - English (United States)',
+  'Microsoft Guy Online (Natural) - English (United States)',
+  'Microsoft Aria Online (Natural)',
+  'Microsoft Jenny Online (Natural)',
+  // Google TTS（高品質）
+  'Google US English',
+  'Google UK English Female',
+  'Google UK English Male',
+  // Apple macOS / iOS（自然）
+  'Samantha',           // macOS en-US
+  'Alex',               // macOS en-US
+  'Karen',              // macOS en-AU
+  'Daniel',             // macOS en-GB
+  'Moira',              // macOS en-IE
+  // Windows 組み込み
+  'Microsoft Zira Desktop - English (United States)',
+  'Microsoft David Desktop - English (United States)',
 ];
 
-// 4技能対応の問題データ（バランスの取れた難易度：簡単→普通→難しい）
-const questionsData = {
-    listening: [
-        // 簡単（初心者向け）
-        {
-            skill: 'listening',
-            instruction: '音声を聞いて、適切な応答を選んでください。',
-            audioText: "Hello, how are you?",
-            question: "この音声に対する適切な応答は？",
-            options: [
-                { text: "I'm fine, thank you. And you?", correct: true, score: 3 },
-                { text: "I'm fine, thanks. How about you?", correct: false, score: 2 },
-                { text: "I'm good, thank you.", correct: false, score: 1 },
-                { text: "Good morning.", correct: false, score: 0 }
-            ]
-        },
-        // 普通（中級者向け）
-        {
-            skill: 'listening',
-            instruction: '音声を聞いて、適切な応答を選んでください。',
-            audioText: "I'm sorry, but I can't make it to the meeting tomorrow.",
-            question: "この音声に対する適切な応答は？",
-            options: [
-                { text: "That's okay. We can reschedule.", correct: true, score: 3 },
-                { text: "No problem. Let's reschedule it.", correct: false, score: 2 },
-                { text: "Yes, I understand.", correct: false, score: 1 },
-                { text: "Thank you.", correct: false, score: 0 }
-            ]
-        },
-        {
-            skill: 'listening',
-            instruction: '音声を聞いて、詳細情報を聞き取ってください。',
-            audioText: "The conference will be held in Room 301 at 2 PM. Please bring your presentation materials.",
-            question: "音声の内容として正しいのは？",
-            options: [
-                { text: "会議は午後2時に301号室で行われます。", correct: true, score: 3 },
-                { text: "会議は午後2時に301号室で行われ、資料を持参する必要があります。", correct: false, score: 2 },
-                { text: "会議は午前2時に301号室で行われます。", correct: false, score: 1 },
-                { text: "会議は午後2時に201号室で行われます。", correct: false, score: 0 }
-            ]
-        },
-        // 難しい（上級者向け）
-        {
-            skill: 'listening',
-            instruction: '音声を聞いて、話者の意図を推測してください。',
-            audioText: "I was wondering if you could help me with this project. It's due next week and I'm a bit behind schedule.",
-            question: "話者は何を求めていますか？",
-            options: [
-                { text: "プロジェクトの手伝い", correct: true, score: 3 },
-                { text: "プロジェクトのサポート", correct: false, score: 2 },
-                { text: "プロジェクトの延期", correct: false, score: 1 },
-                { text: "プロジェクトの説明", correct: false, score: 0 }
-            ]
-        },
-        {
-            skill: 'listening',
-            instruction: '音声を聞いて、会話の文脈を理解してください。',
-            audioText: "A: Have you finished the report? B: Almost. I just need to add the conclusion. A: Great! Can you send it to me by 5 PM?",
-            question: "会話の内容として正しいのは？",
-            options: [
-                { text: "Bは報告書をほぼ完成させており、午後5時までに送る予定", correct: true, score: 3 },
-                { text: "Bは報告書を完成させており、午後5時までに送る予定", correct: false, score: 2 },
-                { text: "Bは報告書をまだ始めていない", correct: false, score: 0 },
-                { text: "Bは報告書を午後5時までに完成させる", correct: false, score: 1 }
-            ]
-        }
-    ],
-    reading: [
-        // 簡単（初心者向け）
-        {
-            skill: 'reading',
-            instruction: '次の文章を読んで、空欄に適切な語句を選んでください。',
-            passage: "I _____ to the store yesterday.",
-            question: "空欄に入る最も適切な語句は？",
-            options: [
-                { text: "went", correct: true, score: 3 },
-                { text: "was going", correct: false, score: 2 },
-                { text: "go", correct: false, score: 1 },
-                { text: "going", correct: false, score: 0 }
-            ]
-        },
-        // 普通（中級者向け）
-        {
-            skill: 'reading',
-            instruction: '次の文章を読んで、空欄に適切な語句を選んでください。',
-            passage: "The company has decided to _____ its operations to reduce costs and improve efficiency.",
-            question: "空欄に入る最も適切な語句は？",
-            options: [
-                { text: "restructure", correct: true, score: 3 },
-                { text: "restore", correct: false, score: 1 },
-                { text: "restrict", correct: false, score: 0 },
-                { text: "restart", correct: false, score: 1 }
-            ]
-        },
-        {
-            skill: 'reading',
-            instruction: '次の文章を読んで、筆者の主張を理解してください。',
-            passage: "While remote work offers flexibility and work-life balance, it also presents challenges in team communication and collaboration. Companies must find a balance between these benefits and drawbacks.",
-            question: "筆者の主張として最も適切なのは？",
-            options: [
-                { text: "リモートワークには利点と課題があり、バランスを取る必要がある", correct: true, score: 3 },
-                { text: "リモートワークの利点と課題を考慮し、適切なバランスを見つけるべき", correct: false, score: 2 },
-                { text: "リモートワークは完全に良い", correct: false, score: 0 },
-                { text: "リモートワークは完全に悪い", correct: false, score: 0 }
-            ]
-        },
-        {
-            skill: 'reading',
-            instruction: '次の文章を読んで、文脈から意味を推測してください。',
-            passage: "The new policy has been met with mixed reactions. Some employees welcome the change, while others are skeptical about its effectiveness.",
-            question: "mixed reactions の意味として最も適切なのは？",
-            options: [
-                { text: "賛否両論", correct: true, score: 3 },
-                { text: "様々な反応", correct: false, score: 2 },
-                { text: "全面的な賛成", correct: false, score: 0 },
-                { text: "全面的な反対", correct: false, score: 0 }
-            ]
-        },
-        {
-            skill: 'reading',
-            instruction: '次の文章を読んで、詳細情報を把握してください。',
-            passage: "The annual conference will take place from March 15th to 17th at the Tokyo International Forum. Registration opens on February 1st and closes on March 1st. Early bird registration is available until February 15th with a 20% discount.",
-            question: "早期登録の割引率と期限は？",
-            options: [
-                { text: "20%割引、2月15日まで", correct: true, score: 3 },
-                { text: "20%割引、3月1日まで", correct: false, score: 2 },
-                { text: "15%割引、2月15日まで", correct: false, score: 1 },
-                { text: "15%割引、3月1日まで", correct: false, score: 0 }
-            ]
-        }
-    ],
-    speaking: [
-        // 簡単（初心者向け）
-        {
-            skill: 'speaking',
-            instruction: '次の状況で、適切な表現を選んでください。',
-            scenario: "初めて会う人に挨拶する時、最も適切な表現は？",
-            question: "初めて会う人に挨拶する時、何と言いますか？",
-            options: [
-                { text: "Nice to meet you.", correct: true, score: 3 },
-                { text: "Pleased to meet you.", correct: false, score: 2 },
-                { text: "Good morning.", correct: false, score: 1 },
-                { text: "Goodbye.", correct: false, score: 0 }
-            ]
-        },
-        // 普通（中級者向け）
-        {
-            skill: 'speaking',
-            instruction: '次の状況で、適切な表現を選んでください。',
-            scenario: "会議で自分の意見を述べる時、最も適切な表現は？",
-            question: "会議で意見を述べる時、何と言いますか？",
-            options: [
-                { text: "I'd like to share my perspective on this matter.", correct: true, score: 3 },
-                { text: "I think so.", correct: false, score: 1 },
-                { text: "Yes.", correct: false, score: 0 },
-                { text: "OK.", correct: false, score: 0 }
-            ]
-        },
-        {
-            skill: 'speaking',
-            instruction: '次の状況で、適切な表現を選んでください。',
-            scenario: "電話で相手に待ってもらう時、最も適切な表現は？",
-            question: "電話で待ってもらう時、何と言いますか？",
-            options: [
-                { text: "Could you please hold for a moment?", correct: true, score: 3 },
-                { text: "Would you mind holding for a moment?", correct: false, score: 2 },
-                { text: "One moment, please.", correct: false, score: 1 },
-                { text: "Wait.", correct: false, score: 0 }
-            ]
-        },
-        {
-            skill: 'speaking',
-            instruction: '次の状況で、適切な表現を選んでください。',
-            scenario: "プレゼンテーションで質問に答える時、最も適切な表現は？",
-            question: "質問に答える時、何と言いますか？",
-            options: [
-                { text: "That's a great question. Let me address that.", correct: true, score: 3 },
-                { text: "That's a good question. Let me explain.", correct: false, score: 2 },
-                { text: "I understand your question.", correct: false, score: 1 },
-                { text: "I don't know.", correct: false, score: 0 }
-            ]
-        },
-        {
-            skill: 'speaking',
-            instruction: '次の状況で、適切な表現を選んでください。',
-            scenario: "会議で提案をする時、最も適切な表現は？",
-            question: "会議で提案をする時、何と言いますか？",
-            options: [
-                { text: "I'd like to propose that we consider this option.", correct: true, score: 3 },
-                { text: "I suggest we consider this option.", correct: false, score: 2 },
-                { text: "This is good.", correct: false, score: 1 },
-                { text: "I want this.", correct: false, score: 0 }
-            ]
-        }
-    ],
-    writing: [
-        // 簡単（初心者向け）
-        {
-            skill: 'writing',
-            instruction: '次の文を最も適切な形に書き換えてください。',
-            original: "I go to school.",
-            question: "過去形にすると？",
-            options: [
-                { text: "I went to school.", correct: true, score: 3 },
-                { text: "I was going to school.", correct: false, score: 2 },
-                { text: "I go to school yesterday.", correct: false, score: 1 },
-                { text: "I going to school.", correct: false, score: 0 }
-            ]
-        },
-        // 普通（中級者向け）
-        {
-            skill: 'writing',
-            instruction: '次の文を最も適切な形に書き換えてください。',
-            original: "Can you send me the report?",
-            question: "より丁寧な表現は？",
-            options: [
-                { text: "Could you please send me the report?", correct: true, score: 3 },
-                { text: "Send me the report.", correct: false, score: 0 },
-                { text: "I need the report.", correct: false, score: 1 },
-                { text: "Report, please.", correct: false, score: 0 }
-            ]
-        },
-        {
-            skill: 'writing',
-            instruction: '次の文を最も適切な形に書き換えてください。',
-            original: "I'm sorry I'm late.",
-            question: "より丁寧な表現は？",
-            options: [
-                { text: "I apologize for being late.", correct: true, score: 3 },
-                { text: "I'm sorry for my tardiness.", correct: false, score: 2 },
-                { text: "Sorry I'm late.", correct: false, score: 1 },
-                { text: "I'm late.", correct: false, score: 0 }
-            ]
-        },
-        // 難しい（上級者向け）
-        {
-            skill: 'writing',
-            instruction: '次の文を最も適切な形に書き換えてください。',
-            original: "I want to inform you that the meeting has been cancelled.",
-            question: "より丁寧な表現は？",
-            options: [
-                { text: "I would like to inform you that the meeting has been cancelled.", correct: true, score: 3 },
-                { text: "I wish to inform you that the meeting has been cancelled.", correct: false, score: 2 },
-                { text: "I want to tell you the meeting is cancelled.", correct: false, score: 1 },
-                { text: "The meeting is cancelled.", correct: false, score: 0 }
-            ]
-        },
-        {
-            skill: 'writing',
-            instruction: '次の文を最も適切な形に書き換えてください。',
-            original: "I need this done by Friday.",
-            question: "より丁寧な表現は？",
-            options: [
-                { text: "I would appreciate it if this could be completed by Friday.", correct: true, score: 3 },
-                { text: "It would be great if this could be completed by Friday.", correct: false, score: 2 },
-                { text: "I want this by Friday.", correct: false, score: 1 },
-                { text: "Do this by Friday.", correct: false, score: 0 }
-            ]
-        }
-    ]
-};
+let _cachedVoice = null;
 
-// コースデータ
-const coursesData = {
-    travel: {
-        name: "旅行英会話コース",
-        level: "中級クラス",
-        icon: "✈️",
-        benefits: [
-            "空港でスムーズにチェックイン",
-            "レストランで注文やクレーム対応",
-            "現地の人と自然な会話",
-            "観光地での質問や案内"
-        ]
-    },
-    business: {
-        name: "ビジネス英会話コース",
-        level: "中級クラス",
-        icon: "💼",
-        benefits: [
-            "会議で意見を述べられる",
-            "メールを適切に書ける",
-            "プレゼンテーションができる",
-            "電話対応がスムーズに"
-        ]
-    },
-    daily: {
-        name: "日常英会話コース",
-        level: "中級クラス",
-        icon: "💬",
-        benefits: [
-            "自己紹介が自然にできる",
-            "買い物やレストランで困らない",
-            "道案内ができる",
-            "日常的な会話を楽しめる"
-        ]
-    },
-    'study-abroad': {
-        name: "留学準備コース",
-        level: "中級～上級",
-        icon: "🌍",
-        benefits: [
-            "留学先での生活に必要な英語力",
-            "アカデミックな英語表現",
-            "現地でのコミュニケーション",
-            "文化理解と適応力"
-        ]
-    },
-    presentation: {
-        name: "プレゼン・スピーチコース",
-        level: "中級～上級",
-        icon: "🎤",
-        benefits: [
-            "効果的なプレゼンテーション",
-            "説得力のあるスピーチ",
-            "質疑応答への対応",
-            "ビジネスシーンでの表現力"
-        ]
-    },
-    meeting: {
-        name: "会議・ディスカッションコース",
-        level: "中級～上級",
-        icon: "📊",
-        benefits: [
-            "会議での積極的な発言",
-            "ディスカッションでの意見交換",
-            "交渉力の向上",
-            "国際的なビジネスコミュニケーション"
-        ]
-    },
-    career: {
-        name: "キャリアアップ英会話コース",
-        level: "中級～上級",
-        icon: "🚀",
-        benefits: [
-            "転職・昇進に必要な英語力",
-            "面接での自己PR",
-            "ビジネス文書の作成",
-            "グローバルなキャリア形成"
-        ]
-    },
-    toeic: {
-        name: "TOEIC®対策コース",
-        level: "全レベル対応",
-        icon: "📝",
-        benefits: [
-            "TOEICスコアアップ",
-            "リスニング・リーディング強化",
-            "試験対策とテクニック",
-            "目標スコア達成"
-        ]
-    },
-    eiken: {
-        name: "英検®対策コース",
-        level: "全レベル対応",
-        icon: "🏆",
-        benefits: [
-            "英検合格を目指す",
-            "4技能すべてを強化",
-            "試験対策と過去問演習",
-            "目標級の取得"
-        ]
-    },
-    other: {
-        name: "総合英会話コース",
-        level: "初級～上級",
-        icon: "🌟",
-        benefits: [
-            "様々なシチュエーションに対応",
-            "基礎から応用まで学べる",
-            "総合的な英語力を向上",
-            "自分のペースで学習"
-        ]
+/** 利用可能な最高品質の英語音声を返す */
+function getBestEnglishVoice() {
+  if (_cachedVoice) return Promise.resolve(_cachedVoice);
+
+  return new Promise(function(resolve) {
+    function pick() {
+      const voices = window.speechSynthesis.getVoices();
+      if (!voices.length) return null;
+
+      // 1. 優先リストから完全一致
+      for (const name of PREFERRED_VOICES) {
+        const v = voices.find(function(v) { return v.name === name; });
+        if (v) return v;
+      }
+      // 2. 優先リストから部分一致（"Natural" を含むもの優先）
+      const natural = voices.find(function(v) {
+        return v.lang.startsWith('en') && v.name.toLowerCase().includes('natural');
+      });
+      if (natural) return natural;
+
+      // 3. "Online" を含む en-US 音声
+      const online = voices.find(function(v) {
+        return v.lang === 'en-US' && v.name.toLowerCase().includes('online');
+      });
+      if (online) return online;
+
+      // 4. en-US ならなんでも
+      const enUS = voices.find(function(v) { return v.lang === 'en-US'; });
+      if (enUS) return enUS;
+
+      // 5. 英語ならなんでも
+      return voices.find(function(v) { return v.lang.startsWith('en'); }) || null;
     }
-};
 
-// TOEICスコア計算（各技能のスコアから推定）
-function calculateTOEICScore(skillScores) {
-    const totalScore = skillScores.listening + skillScores.reading;
-    const maxScore = 15; // 各技能5問×3点
-    
-    // TOEICスコアは495点満点（リスニング）+ 495点満点（リーディング）= 990点満点
-    // 簡易計算: スコアを990点に換算
-    const listeningScore = Math.round((skillScores.listening / maxScore) * 495);
-    const readingScore = Math.round((skillScores.reading / maxScore) * 495);
-    const totalTOEIC = listeningScore + readingScore;
-    
-    return {
-        listening: listeningScore,
-        reading: readingScore,
-        total: totalTOEIC
+    const immediate = pick();
+    if (immediate) {
+      _cachedVoice = immediate;
+      return resolve(immediate);
+    }
+
+    // 音声リストがまだロードされていない場合（Chrome の初回ロード問題）
+    window.speechSynthesis.addEventListener('voiceschanged', function handler() {
+      window.speechSynthesis.removeEventListener('voiceschanged', handler);
+      _cachedVoice = pick();
+      resolve(_cachedVoice);
+    });
+  });
+}
+
+function playAudio(text, btn) {
+  if (!window.speechSynthesis) {
+    btn.title = 'お使いのブラウザは音声再生に対応していません';
+    return;
+  }
+
+  // 再生中なら停止
+  if (window.speechSynthesis.speaking) {
+    window.speechSynthesis.cancel();
+    btn.innerHTML = '<span class="material-icons">volume_up</span> 音声を再生する';
+    return;
+  }
+
+  btn.innerHTML = '<span class="material-icons">hourglass_top</span> 読み込み中...';
+
+  getBestEnglishVoice().then(function(voice) {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang  = 'en-US';
+    utterance.rate  = 0.82;   // 自然なペース（速すぎず遅すぎず）
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    if (voice) utterance.voice = voice;
+
+    btn.innerHTML = '<span class="material-icons">stop_circle</span> 再生中（クリックで停止）';
+
+    utterance.onstart = function() {
+      btn.innerHTML = '<span class="material-icons">stop_circle</span> 再生中（クリックで停止）';
     };
-}
 
-// 英検級判定（より厳しい基準）
-function calculateEikenLevel(toeicScore) {
-    if (toeicScore >= 900) {
-        return { level: "1級", description: "大学上級程度" };
-    } else if (toeicScore >= 800) {
-        return { level: "準1級", description: "大学中級程度" };
-    } else if (toeicScore >= 650) {
-        return { level: "2級", description: "高校卒業程度" };
-    } else if (toeicScore >= 500) {
-        return { level: "準2級", description: "高校中級程度" };
-    } else if (toeicScore >= 350) {
-        return { level: "3級", description: "中学卒業程度" };
-    } else if (toeicScore >= 250) {
-        return { level: "4級", description: "中学中級程度" };
-    } else {
-        return { level: "5級", description: "中学初級程度" };
-    }
-}
-
-// CEFRレベル判定
-function calculateCEFRLevel(toeicScore) {
-    if (toeicScore >= 945) {
-        return { level: "C2", description: "Mastery（熟達）" };
-    } else if (toeicScore >= 785) {
-        return { level: "C1", description: "Effective Operational Proficiency（効果的な運用能力）" };
-    } else if (toeicScore >= 550) {
-        return { level: "B2", description: "Vantage（高級）" };
-    } else if (toeicScore >= 225) {
-        return { level: "B1", description: "Threshold（中級）" };
-    } else if (toeicScore >= 120) {
-        return { level: "A2", description: "Waystage（初級）" };
-    } else {
-        return { level: "A1", description: "Breakthrough（入門）" };
-    }
-}
-
-// 総合レベル判定（より厳しい基準）
-function calculateOverallLevel(skillScores) {
-    const totalScore = skillScores.listening + skillScores.reading + skillScores.speaking + skillScores.writing;
-    const maxScore = 60; // 各技能5問×3点×4技能
-    
-    // より厳しい基準に変更
-    if (totalScore >= 52) {
-        return {
-            japanese: "上級",
-            english: "Advanced",
-            stars: 5
-        };
-    } else if (totalScore >= 42) {
-        return {
-            japanese: "中級〜上級",
-            english: "Intermediate-Advanced",
-            stars: 4
-        };
-    } else if (totalScore >= 30) {
-        return {
-            japanese: "中級",
-            english: "Intermediate",
-            stars: 3
-        };
-    } else if (totalScore >= 18) {
-        return {
-            japanese: "初級〜中級",
-            english: "Beginner-Intermediate",
-            stars: 2
-        };
-    } else {
-        return {
-            japanese: "初級",
-            english: "Beginner",
-            stars: 1
-        };
-    }
-}
-
-// 弱い技能を特定してアドバイスを生成
-function generateAdvice(skillScores) {
-    const maxScore = 15; // 各技能5問×3点
-    const skillNames = {
-        listening: { name: 'リスニング', icon: '🎧' },
-        reading: { name: 'リーディング', icon: '📖' },
-        speaking: { name: 'スピーキング', icon: '🗣️' },
-        writing: { name: 'ライティング', icon: '✍️' }
+    utterance.onend = function() {
+      btn.innerHTML = '<span class="material-icons">volume_up</span> 音声を再生する';
     };
-    
-    // 各技能のスコアを配列に変換
-    const skillArray = Object.keys(skillScores).map(skill => ({
-        id: skill,
-        name: skillNames[skill].name,
-        icon: skillNames[skill].icon,
-        score: skillScores[skill],
-        percentage: (skillScores[skill] / maxScore) * 100
-    }));
-    
-    // スコアが低い順にソート
-    skillArray.sort((a, b) => a.score - b.score);
-    
-    // 最も低い技能を特定（60%未満を「弱い」とする）
-    const weakSkills = skillArray.filter(skill => skill.percentage < 60);
-    
-    if (weakSkills.length > 0) {
-        const weakestSkill = weakSkills[0];
-        const adviceMessages = {
-            listening: `🎧 リスニング力を伸ばしましょう！\n英語の音声に慣れることで、会話力が大きく向上します。\n当校のリスニング強化コースで、実践的な聞き取り力を身につけましょう！`,
-            reading: `📖 リーディング力を伸ばしましょう！\n文章を読むことで語彙力と理解力が向上します。\n当校のリーディング強化コースで、長文読解力を身につけましょう！`,
-            speaking: `🗣️ スピーキング力を伸ばしましょう！\n実際に話す練習で、自信を持って英語を話せるようになります。\n当校のスピーキング強化コースで、自然な会話力を身につけましょう！`,
-            writing: `✍️ ライティング力を伸ばしましょう！\n文章を書くことで、正確な英語表現が身につきます。\n当校のライティング強化コースで、ビジネス文書も書けるようになりましょう！`
-        };
-        
-        return {
-            hasWeakSkill: true,
-            skill: weakestSkill,
-            message: adviceMessages[weakestSkill.id]
-        };
-    } else {
-        // すべての技能がバランスよくできている場合
-        const highestSkill = skillArray[skillArray.length - 1];
-        return {
-            hasWeakSkill: false,
-            skill: highestSkill,
-            message: `素晴らしいバランスです！\n${highestSkill.name}が特に得意ですね。\nさらに上を目指して、総合的な英語力を高めていきましょう！`
-        };
-    }
+
+    utterance.onerror = function() {
+      btn.innerHTML = '<span class="material-icons">volume_up</span> 音声を再生する';
+    };
+
+    window.speechSynthesis.speak(utterance);
+  });
 }
 
-// 音声再生機能
-let currentUtterance = null;
-let isAudioInitialized = false;
-
-// 音声合成の初期化（Edge対応）
-function initializeAudio() {
-    if ('speechSynthesis' in window && !isAudioInitialized) {
-        // Edge/Chromeで音声合成を初期化するために、空の音声を一度再生
-        const initUtterance = new SpeechSynthesisUtterance('');
-        initUtterance.volume = 0;
-        window.speechSynthesis.speak(initUtterance);
-        window.speechSynthesis.cancel();
-        isAudioInitialized = true;
-    }
-}
-
-// ページ読み込み時に初期化
-document.addEventListener('DOMContentLoaded', function() {
-    // 少し遅延して初期化（Edge対応）
-    setTimeout(function() {
-        initializeAudio();
-    }, 500);
-});
-
-function playAudio(text, button) {
-    // ボタンの状態を更新
-    const originalText = button.textContent;
-    button.textContent = '⏸️ 再生中...';
-    button.classList.add('playing');
-    button.disabled = true;
-    
-    // ブラウザの音声合成APIを使用
-    if ('speechSynthesis' in window) {
-        // 音声合成を初期化（Edge対応）
-        initializeAudio();
-        
-        // 既存の音声を停止
-        window.speechSynthesis.cancel();
-        
-        // Edge/Chromeで確実に動作するように、少し待ってから再生
-        setTimeout(function() {
-            try {
-                const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = 'en-US';
-                utterance.rate = 0.85; // 少しゆっくりめ（リスニング用）
-                utterance.pitch = 1;
-                utterance.volume = 1;
-                
-                currentUtterance = utterance;
-                
-                let isPlaying = false;
-                let timeoutId = null;
-                
-                utterance.onstart = function() {
-                    isPlaying = true;
-                    console.log('音声再生開始');
-                    // タイムアウトをクリア
-                    if (timeoutId) {
-                        clearTimeout(timeoutId);
-                    }
-                };
-                
-                utterance.onend = function() {
-                    isPlaying = false;
-                    button.textContent = originalText;
-                    button.classList.remove('playing');
-                    button.disabled = false;
-                    currentUtterance = null;
-                    if (timeoutId) {
-                        clearTimeout(timeoutId);
-                    }
-                };
-                
-                utterance.onerror = function(event) {
-                    isPlaying = false;
-                    button.textContent = originalText;
-                    button.classList.remove('playing');
-                    button.disabled = false;
-                    currentUtterance = null;
-                    if (timeoutId) {
-                        clearTimeout(timeoutId);
-                    }
-                    
-                    console.error('音声再生エラー:', event);
-                    
-                    // エラーの種類に応じたメッセージ
-                    let errorMsg = '音声の再生に失敗しました。';
-                    if (event.error === 'not-allowed') {
-                        errorMsg += '\n\n【対処法】\n1. ブラウザの設定で音声合成を許可してください\n2. ページをリロードして再試行してください';
-                    } else if (event.error === 'network') {
-                        errorMsg += '\nネットワークエラーが発生しました。';
-                    } else if (event.error === 'synthesis-failed') {
-                        errorMsg += '\n音声合成エンジンの問題です。\nページをリロードして再試行してください。';
-                    } else {
-                        errorMsg += '\n\n【対処法】\n1. Edgeを最新版に更新してください\n2. ページをリロードして再試行してください\n3. 他のブラウザ（Chrome）でもお試しください';
-                    }
-                    alert(errorMsg);
-                };
-                
-                // 音声再生
-                window.speechSynthesis.speak(utterance);
-                
-                // 3秒後に再生が開始されていない場合のタイムアウト
-                timeoutId = setTimeout(function() {
-                    if (!isPlaying && currentUtterance === utterance) {
-                        // 再生が開始されていない
-                        window.speechSynthesis.cancel();
-                        button.textContent = originalText;
-                        button.classList.remove('playing');
-                        button.disabled = false;
-                        currentUtterance = null;
-                        
-                        // 再試行を促す
-                        if (confirm('音声の再生が開始されませんでした。\nもう一度お試ししますか？')) {
-                            playAudio(text, button);
-                        }
-                    }
-                }, 3000);
-                
-            } catch (error) {
-                console.error('音声再生エラー:', error);
-                button.textContent = originalText;
-                button.classList.remove('playing');
-                button.disabled = false;
-                alert('音声の再生に失敗しました。\n\n【対処法】\n1. Edgeを最新版に更新してください\n2. ページをリロードして再試行してください\n3. 他のブラウザ（Chrome）でもお試しください');
-            }
-        }, 200); // Edge対応で少し長めに待つ
-        
-    } else {
-        button.textContent = originalText;
-        button.classList.remove('playing');
-        button.disabled = false;
-        alert('お使いのブラウザでは音声再生機能がサポートされていません。\nEdgeを最新版に更新するか、Chrome、Safariなどの最新ブラウザをご使用ください。');
-    }
-}
-
-// 診断結果ID生成（要件定義書に基づく: LVL-{YYYYMMDD}-{ランダム6文字英数字}）
-function generateResultId() {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    const dateStr = `${year}${month}${day}`;
-    
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let randomStr = '';
-    for (let i = 0; i < 6; i++) {
-        randomStr += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    
-    return `LVL-${dateStr}-${randomStr}`;
-}
-
-// 用途選択のイベントハンドラー（グローバル関数）
-function setupPurposeCardHandlers() {
-    console.log('[STEP 1] Setting up purpose card handlers - 開始');
-    
-    // まず、purpose-screenが存在するか確認
-    const purposeScreen = document.getElementById('purpose-screen');
-    if (!purposeScreen) {
-        console.error('[STEP 1-ERROR] purpose-screen要素が見つかりません');
-        return;
-    }
-    console.log('[STEP 1-OK] purpose-screen要素を発見');
-    
-    // カード要素を検索
-    const cards = document.querySelectorAll('.purpose-card');
-    console.log('[STEP 2] カード要素を検索:', cards.length, '個見つかりました');
-    
-    if (cards.length === 0) {
-        console.error('[STEP 2-ERROR] purpose-card要素が見つかりません');
-        return;
-    }
-    
-    // 既存のイベントリスナーを削除するため、カードをクローン
-    console.log('[STEP 3] 既存のイベントリスナーを削除（クローン方式）');
-    cards.forEach((card, index) => {
-        const parent = card.parentNode;
-        if (parent) {
-            const newCard = card.cloneNode(true);
-            parent.replaceChild(newCard, card);
-            console.log(`[STEP 3] カード ${index + 1} をクローンしました`);
-        }
-    });
-    
-    // 再度カードを取得（クローン後の要素）
-    const newCards = document.querySelectorAll('.purpose-card');
-    console.log('[STEP 4] クローン後のカード要素を取得:', newCards.length, '個');
-    
-    // 各カードに直接イベントリスナーを設定
-    console.log('[STEP 5] 各カードにイベントリスナーを設定');
-    newCards.forEach((card, index) => {
-        const purpose = card.dataset.purpose;
-        console.log(`[STEP 5] カード ${index + 1}: data-purpose="${purpose}"`);
-        
-        card.addEventListener('click', function(e) {
-            console.log('[CLICK] カードがクリックされました:', purpose);
-            
-            e.preventDefault();
-            e.stopPropagation();
-            
-            if (!purpose) {
-                console.error('[CLICK-ERROR] No purpose data attribute found');
-                return;
-            }
-            
-            if (!window.selectedPurposes) {
-                window.selectedPurposes = [];
-            }
-            
-            if (window.selectedPurposes.includes(purpose)) {
-                window.selectedPurposes = window.selectedPurposes.filter(p => p !== purpose);
-                this.classList.remove('selected');
-                console.log('[CLICK] 選択解除:', purpose, '現在の選択:', window.selectedPurposes);
-            } else {
-                window.selectedPurposes.push(purpose);
-                this.classList.add('selected');
-                console.log('[CLICK] 選択:', purpose, '現在の選択:', window.selectedPurposes);
-            }
-            
-            const nextBtn = document.getElementById('purpose-next-btn');
-            if (nextBtn) {
-                nextBtn.disabled = window.selectedPurposes.length === 0;
-                console.log('[CLICK] 次へボタンの状態:', nextBtn.disabled ? '無効' : '有効');
-            }
-        }, true); // capture phaseで確実に捕捉
-        
-        console.log(`[STEP 5-OK] カード ${index + 1} にイベントリスナーを設定しました`);
-    });
-    
-    console.log('[STEP 6] Purpose card handlers setup complete - 完了');
-}
-
-// 画面遷移
-function showScreen(screenId) {
-    console.log('画面遷移:', screenId);
-    const screens = document.querySelectorAll('.screen');
-    screens.forEach(screen => {
-        screen.classList.remove('active');
-    });
-    const targetScreen = document.getElementById(screenId);
-    if (targetScreen) {
-        targetScreen.classList.add('active');
-        console.log('画面遷移成功:', screenId);
-        
-        // purpose-screenが表示された時にイベントリスナーを再設定
-        if (screenId === 'purpose-screen') {
-            console.log('[showScreen] purpose-screen表示を検出、イベントリスナーを設定します...');
-            // DOMが完全に更新されるまで待つ
-            setTimeout(function() {
-                console.log('[showScreen] 遅延後にsetupPurposeCardHandlersを呼び出します');
-                setupPurposeCardHandlers();
-            }, 300);
-        }
-    } else {
-        console.error('画面が見つかりません:', screenId);
-    }
-}
-
-// グローバル変数（診断方法）
-// selectedMethodとselectedLevelはindex.htmlで定義されている
-// ここでは宣言せず、既存のグローバル変数を使用する
-
-// 診断開始ボタンのハンドラー（グローバル関数として定義）
-function handleStartClick(event) {
-    if (event) {
-        event.preventDefault();
-        event.stopPropagation();
-    }
-    console.log('診断開始ボタンがクリックされました（インライン）');
-    showScreen('method-screen');
-    return false;
-}
-
-// イベントリスナー
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOMContentLoaded: イベントリスナーを設定します');
-    
-    // ランディング画面
-    const startBtn = document.getElementById('start-btn');
-    if (startBtn) {
-        console.log('start-btnが見つかりました');
-        startBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('診断開始ボタンがクリックされました（イベントリスナー）');
-            showScreen('method-screen');
-            return false;
-        });
-    } else {
-        console.error('start-btnが見つかりません');
-    }
-    
-    // 診断方法選択
-    const levelSelectMethod = document.getElementById('level-select-method');
-    if (levelSelectMethod) {
-        levelSelectMethod.addEventListener('click', function(e) {
-            // ボタンがクリックされた場合も処理する
-            if (e.target.tagName === 'BUTTON') {
-                e.stopPropagation();
-            }
-            console.log('レベル選択診断が選択されました');
-            selectedMethod = 'level-select';
-            showScreen('level-select-screen');
-        });
-        
-        // ボタンにも直接イベントリスナーを設定
-        const levelSelectBtn = levelSelectMethod.querySelector('.method-btn');
-        if (levelSelectBtn) {
-            levelSelectBtn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                console.log('レベル選択診断ボタンがクリックされました');
-                selectedMethod = 'level-select';
-                showScreen('level-select-screen');
-            });
-        }
-    } else {
-        console.error('level-select-methodが見つかりません');
-    }
-    
-    const autoMethod = document.getElementById('auto-method');
-    if (autoMethod) {
-        autoMethod.addEventListener('click', function(e) {
-            // ボタンがクリックされた場合も処理する
-            if (e.target.tagName === 'BUTTON') {
-                e.stopPropagation();
-            }
-            console.log('自動判定診断が選択されました');
-            selectedMethod = 'auto';
-            selectedLevel = null;
-            showScreen('purpose-screen');
-        });
-        
-        // ボタンにも直接イベントリスナーを設定
-        const autoMethodBtn = autoMethod.querySelector('.method-btn');
-        if (autoMethodBtn) {
-            autoMethodBtn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                console.log('自動判定診断ボタンがクリックされました');
-                selectedMethod = 'auto';
-                selectedLevel = null;
-                showScreen('purpose-screen');
-            });
-        }
-    } else {
-        console.error('auto-methodが見つかりません');
-    }
-    
-    // レベル選択画面
-    document.querySelectorAll('.level-card').forEach(card => {
-        card.addEventListener('click', function() {
-            document.querySelectorAll('.level-card').forEach(c => c.classList.remove('selected'));
-            this.classList.add('selected');
-            selectedLevel = this.dataset.level;
-            
-            // 少し待ってから用途選択画面へ
-            setTimeout(() => {
-                showScreen('purpose-screen');
-            }, 300);
-        });
-    });
-    
-    document.getElementById('level-back-btn').addEventListener('click', function() {
-        showScreen('method-screen');
-    });
-
-    // 用途選択のイベントリスナーを初期設定（画面遷移時にも再設定される）
-    // 初期ロード時にも設定を試みる
-    if (document.getElementById('purpose-screen')) {
-        console.log('[DOMContentLoaded] 初期ロード時にsetupPurposeCardHandlersを呼び出します');
-        setupPurposeCardHandlers();
-    }
-
-    document.getElementById('purpose-next-btn').addEventListener('click', function() {
-        if (!window.selectedPurposes) {
-            window.selectedPurposes = [];
-        }
-        if (window.selectedPurposes.length > 0) {
-            startQuiz();
-        }
-    });
-
-    // 診断画面
-    document.getElementById('skip-btn').addEventListener('click', function() {
-        if (currentQuestionIndex < diagnosisSkills.length) {
-            const currentQuestionData = diagnosisSkills[currentQuestionIndex];
-            handleAnswer(null, currentQuestionData.skillId);
-        }
-    });
-
-    // 問い合わせフォーム
-    document.getElementById('contact-form').addEventListener('submit', function(e) {
-        e.preventDefault();
-        if (validateForm()) {
-            showScreen('complete-screen');
-        }
-    });
-
-    // 送信完了画面
-    document.getElementById('home-btn').addEventListener('click', function() {
-        // リセット
-        window.selectedPurposes = [];
-        currentSkillIndex = 0;
-        currentQuestionIndex = 0;
-        skillAnswers = {
-            listening: [],
-            reading: [],
-            speaking: [],
-            writing: []
-        };
-        resultData = null;
-        showScreen('landing-screen');
-    });
-
-    // メール送信ボタン（デモ用）
-    document.getElementById('email-btn').addEventListener('click', function() {
-        alert('デモ版ではメール送信機能は実装されていません。\n実際のバージョンでは診断結果をメールで送信します。');
-    });
-
-    // コピーボタン
-    document.getElementById('copy-btn').addEventListener('click', function() {
-        const resultId = document.getElementById('result-id').textContent;
-        navigator.clipboard.writeText(resultId).then(function() {
-            alert('診断結果IDをコピーしました: ' + resultId);
-        });
-    });
-    
-    // 問い合わせ画面へ
-    document.getElementById('contact-btn').addEventListener('click', function() {
-        showScreen('contact-screen');
-    });
-    
-    // 無料体験レッスン・カウンセリングボタン
-    const trialLessonBtn = document.getElementById('trial-lesson-btn');
-    if (trialLessonBtn) {
-        trialLessonBtn.addEventListener('click', function() {
-            // 問い合わせフォームに「無料体験レッスン予約」を設定
-            document.getElementById('inquiry-type').value = 'trial-lesson';
-            showScreen('contact-screen');
-        });
-    }
-    
-    const counselingBtn = document.getElementById('counseling-btn');
-    if (counselingBtn) {
-        counselingBtn.addEventListener('click', function() {
-            // 問い合わせフォームに「無料カウンセリング予約」を設定
-            document.getElementById('inquiry-type').value = 'counseling';
-            showScreen('contact-screen');
-        });
-    }
-});
-
-// 診断開始
+/* ----------------------------------------------------------
+   QUIZ LOGIC
+   ---------------------------------------------------------- */
 function startQuiz() {
-    currentSkillIndex = 0;
-    currentQuestionIndex = 0;
-    skillAnswers = {
-        listening: [],
-        reading: [],
-        speaking: [],
-        writing: []
-    };
-    
-    // 診断方法に応じた問題セットを取得
-    const questionsSet = getQuestionsForDiagnosis();
-    diagnosisQuestions = questionsSet;
-    
-    // 技能リストを構築（すべての診断方法で統一）
-    diagnosisSkills = [];
-    Object.keys(questionsSet).forEach(skillId => {
-        if (questionsSet[skillId] && Array.isArray(questionsSet[skillId])) {
-            questionsSet[skillId].forEach((q, idx) => {
-                diagnosisSkills.push({
-                    skillId: skillId,
-                    questionIndex: idx,
-                    question: q
-                });
-            });
-        }
-    });
-    
-    // 問題をランダムにシャッフル（初級・中級の場合のみ）
-    if (selectedMethod === 'level-select' && (selectedLevel === 'beginner' || selectedLevel === 'intermediate')) {
-        diagnosisSkills = diagnosisSkills.sort(() => Math.random() - 0.5);
-    }
-    
-    showScreen('quiz-screen');
-    loadQuestion();
+  state.questions = [];
+  state.currentQ  = 0;
+  state.answers   = [];
+
+  if (state.method === 'auto' || state.level === 'advanced') {
+    // All 5 per skill = 20 questions
+    state.questions = [
+      ...allQuestions.listening,
+      ...allQuestions.reading,
+      ...allQuestions.speaking,
+      ...allQuestions.writing
+    ];
+  } else if (state.level === 'beginner') {
+    // 5 questions: listening[0-1], reading[0], speaking[0], writing[0]
+    state.questions = shuffle([
+      allQuestions.listening[0],
+      allQuestions.listening[1],
+      allQuestions.reading[0],
+      allQuestions.speaking[0],
+      allQuestions.writing[0]
+    ]);
+  } else if (state.level === 'intermediate') {
+    // 10 questions: listening[0-2], reading[0-2], speaking[0-1], writing[0-1]
+    state.questions = shuffle([
+      allQuestions.listening[0],
+      allQuestions.listening[1],
+      allQuestions.listening[2],
+      allQuestions.reading[0],
+      allQuestions.reading[1],
+      allQuestions.reading[2],
+      allQuestions.speaking[0],
+      allQuestions.speaking[1],
+      allQuestions.writing[0],
+      allQuestions.writing[1]
+    ]);
+  }
+
+  showScreen('screen-quiz');
+  loadQuestion();
 }
 
-// 診断方法に応じた問題数を取得
-function getTotalQuestions() {
-    if (selectedMethod === 'auto') {
-        return 20; // 4技能 × 5問
-    } else if (selectedMethod === 'level-select') {
-        if (selectedLevel === 'beginner') {
-            return 5;
-        } else if (selectedLevel === 'intermediate') {
-            return 10;
-        } else if (selectedLevel === 'advanced') {
-            return 20;
-        }
-    }
-    return 20; // デフォルト
-}
-
-// 診断方法に応じた問題を取得
-function getQuestionsForDiagnosis() {
-    if (selectedMethod === 'auto') {
-        // 自動判定: 4技能 × 5問（各技能から5問ずつ）
-        return {
-            listening: questionsData.listening.slice(0, 5),
-            reading: questionsData.reading.slice(0, 5),
-            speaking: questionsData.speaking.slice(0, 5),
-            writing: questionsData.writing.slice(0, 5)
-        };
-    } else if (selectedMethod === 'level-select') {
-        // レベル選択: 選択したレベルに応じた問題数
-        if (selectedLevel === 'beginner') {
-            // 初級: 5問（簡単な問題から、各技能から1問ずつ、残り1問はリスニングから）
-            return {
-                listening: questionsData.listening.slice(0, 2), // 2問
-                reading: questionsData.reading.slice(0, 1), // 1問
-                speaking: questionsData.speaking.slice(0, 1), // 1問
-                writing: questionsData.writing.slice(0, 1) // 1問
-            };
-        } else if (selectedLevel === 'intermediate') {
-            // 中級: 10問（簡単～普通の問題から、各技能から2問ずつ、残り2問はリスニングとリーディングから）
-            return {
-                listening: questionsData.listening.slice(0, 3), // 3問
-                reading: questionsData.reading.slice(0, 3), // 3問
-                speaking: questionsData.speaking.slice(0, 2), // 2問
-                writing: questionsData.writing.slice(0, 2) // 2問
-            };
-        } else if (selectedLevel === 'advanced') {
-            // 上級: 20問（4技能 × 5問）
-            return {
-                listening: questionsData.listening.slice(0, 5),
-                reading: questionsData.reading.slice(0, 5),
-                speaking: questionsData.speaking.slice(0, 5),
-                writing: questionsData.writing.slice(0, 5)
-            };
-        }
-    }
-    // デフォルト: 自動判定と同じ
-    return {
-        listening: questionsData.listening.slice(0, 5),
-        reading: questionsData.reading.slice(0, 5),
-        speaking: questionsData.speaking.slice(0, 5),
-        writing: questionsData.writing.slice(0, 5)
-    };
-}
-
-// 問題読み込み
 function loadQuestion() {
-    if (currentQuestionIndex >= diagnosisSkills.length) {
-        // 全問題終了
-        showResult();
-        return;
-    }
-    
-    const currentQuestionData = diagnosisSkills[currentQuestionIndex];
-    const question = currentQuestionData.question;
-    const skillId = currentQuestionData.skillId;
-    const currentSkill = skills.find(s => s.id === skillId) || { name: '総合', icon: '📝' };
-    
-    // 進捗バー更新
-    const totalQuestions = getTotalQuestions();
-    const currentQuestionNumber = currentQuestionIndex + 1;
-    const progress = (currentQuestionNumber / totalQuestions) * 100;
-    document.getElementById('quiz-progress').style.width = progress + '%';
-    
-    // ステップ表示更新
-    if (selectedMethod === 'auto') {
-        // 自動判定: 技能名を表示
-        document.getElementById('quiz-step').textContent = `${currentSkill.name} ${currentSkill.icon}`;
-    } else {
-        // レベル選択: ステップのみ表示
-        document.getElementById('quiz-step').textContent = `ステップ ${currentQuestionNumber}/${totalQuestions}`;
-    }
-    document.getElementById('question-number').textContent = `問題 ${currentQuestionNumber}/${totalQuestions}`;
-    
-    // 問題表示
-    const questionContainer = document.querySelector('.question-container');
-    let questionHTML = '';
-    
-    if (question.instruction) {
-        questionHTML += `<div class="question-instruction">${question.instruction}</div>`;
-    }
-    
-    if (question.audioText) {
-        const audioTextEscaped = question.audioText.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-        questionHTML += `
-            <div class="audio-player">
-                <div class="audio-instruction">音声を聞いて、問題に答えてください</div>
-                <button class="btn-play-audio" data-audio-text="${audioTextEscaped}">
-                    🔊 音声を再生
-                </button>
-                <div class="audio-note">※音声は何度でも再生できます</div>
-            </div>
-        `;
-    }
-    
-    if (question.passage) {
-        questionHTML += `<div class="passage-text">${question.passage}</div>`;
-    }
-    
-    if (question.original) {
-        questionHTML += `<div class="original-text">原文: "${question.original}"</div>`;
-    }
-    
-    if (question.scenario) {
-        questionHTML += `<div class="scenario-text">${question.scenario}</div>`;
-    }
-    
-    questionHTML += `<div class="question-scenario">${question.question}</div>`;
-    
-    document.getElementById('question-text').innerHTML = questionHTML;
-    
-    // 音声再生ボタンのイベントリスナー
-    const audioButton = document.querySelector('.btn-play-audio');
-    if (audioButton) {
-        audioButton.addEventListener('click', function() {
-            const audioText = this.getAttribute('data-audio-text');
-            playAudio(audioText, this);
-        });
-    }
-    
-    // 選択肢をランダムにシャッフル
-    const shuffledOptions = [...question.options].sort(() => Math.random() - 0.5);
-    
-    // 選択肢表示
-    const optionsContainer = document.getElementById('options-container');
-    optionsContainer.innerHTML = '';
-    
-    shuffledOptions.forEach((option, index) => {
-        const optionCard = document.createElement('div');
-        optionCard.className = 'option-card';
-        optionCard.textContent = option.text;
-        optionCard.dataset.optionIndex = question.options.indexOf(option); // 元のインデックスを保存
-        optionCard.addEventListener('click', function() {
-            document.querySelectorAll('.option-card').forEach(card => {
-                card.classList.remove('selected');
-            });
-            this.classList.add('selected');
-            document.getElementById('quiz-next-btn').disabled = false;
-        });
-        optionsContainer.appendChild(optionCard);
+  if (state.currentQ >= state.questions.length) {
+    showResult();
+    return;
+  }
+
+  const q        = state.questions[state.currentQ];
+  const total    = state.questions.length;
+  const progress = Math.round((state.currentQ / total) * 100);
+
+  // Update progress
+  const progressEl = document.getElementById('quiz-progress');
+  if (progressEl) progressEl.style.width = progress + '%';
+
+  // Update counter
+  const counterEl = document.getElementById('quiz-counter');
+  if (counterEl) counterEl.textContent = (state.currentQ + 1) + '/' + total;
+
+  // Update skill badge
+  const badgeEl = document.getElementById('quiz-skill-badge');
+  if (badgeEl) {
+    const badgeLabels = { listening: 'Listening', reading: 'Reading', speaking: 'Speaking', writing: 'Writing' };
+    const badgeClasses = { listening: 'badge-listening', reading: 'badge-reading', speaking: 'badge-speaking', writing: 'badge-writing' };
+    badgeEl.textContent = badgeLabels[q.skill] || q.skill;
+    badgeEl.className = 'skill-badge ' + (badgeClasses[q.skill] || '');
+  }
+
+  // Build question HTML
+  let html = '';
+  html += '<div class="question-instruction">' + escapeHtml(q.instruction) + '</div>';
+
+  if (q.audioText) {
+    html += '<button class="audio-btn" id="audio-play-btn" data-audio="' + escapeAttr(q.audioText) + '">';
+    html += '<span class="material-icons">volume_up</span> 音声を再生する';
+    html += '</button>';
+  }
+
+  if (q.passage) {
+    html += '<div class="question-passage">' + escapeHtml(q.passage) + '</div>';
+  }
+
+  if (q.original) {
+    html += '<div class="question-original">' + escapeHtml(q.original) + '</div>';
+  }
+
+  if (q.scenario) {
+    html += '<div class="question-scenario"><strong>場面：</strong>' + escapeHtml(q.scenario) + '</div>';
+  }
+
+  html += '<div class="question-text">' + escapeHtml(q.question) + '</div>';
+  html += '<div class="options-list">';
+  q.options.forEach(function(opt, idx) {
+    html += '<div class="option-card" data-idx="' + idx + '">' + escapeHtml(opt.text) + '</div>';
+  });
+  html += '</div>';
+
+  const card = document.getElementById('question-card');
+  if (card) card.innerHTML = html;
+
+  // Disable next button
+  const nextBtn = document.getElementById('quiz-next-btn');
+  if (nextBtn) {
+    nextBtn.disabled = true;
+    nextBtn.onclick = null;
+  }
+
+  // Attach option click handlers
+  let selectedOption = null;
+  const options = card ? card.querySelectorAll('.option-card') : [];
+  options.forEach(function(optEl) {
+    optEl.addEventListener('click', function(e) {
+      e.stopPropagation();
+      options.forEach(function(o) { o.classList.remove('selected'); });
+      optEl.classList.add('selected');
+      const idx = parseInt(optEl.getAttribute('data-idx'), 10);
+      selectedOption = q.options[idx];
+      if (nextBtn) nextBtn.disabled = false;
     });
-    
-    // 次へボタンを無効化
-    document.getElementById('quiz-next-btn').disabled = true;
-    
-    // 次へボタンのイベント
-    const nextBtn = document.getElementById('quiz-next-btn');
+  });
+
+  // Next button handler
+  if (nextBtn) {
     nextBtn.onclick = function() {
-        const selectedOption = document.querySelector('.option-card.selected');
-        if (selectedOption) {
-            const originalIndex = parseInt(selectedOption.dataset.optionIndex);
-            handleAnswer(question.options[originalIndex], skillId);
-        }
+      handleAnswer(selectedOption);
     };
+  }
+
+  // Skip button handler
+  const skipBtn = document.getElementById('quiz-skip-btn');
+  if (skipBtn) {
+    skipBtn.onclick = function() {
+      handleAnswer(null);
+    };
+  }
+
+  // Audio button handler
+  const audioBtn = document.getElementById('audio-play-btn');
+  if (audioBtn) {
+    audioBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const text = audioBtn.getAttribute('data-audio');
+      playAudio(text, audioBtn);
+    });
+  }
 }
 
-// 回答処理
-function handleAnswer(selectedOption, skillId) {
-    if (selectedOption) {
-        if (!skillAnswers[skillId]) {
-            skillAnswers[skillId] = [];
-        }
-        skillAnswers[skillId].push(selectedOption.score);
-    } else {
-        if (!skillAnswers[skillId]) {
-            skillAnswers[skillId] = [];
-        }
-        skillAnswers[skillId].push(0); // スキップ
-    }
-    
-    currentQuestionIndex++;
-    
-    // 次の問題へ
-    if (currentQuestionIndex < diagnosisSkills.length) {
-        loadQuestion();
-    } else {
-        // 全問題終了
-        showResult();
-    }
+function handleAnswer(selectedOption) {
+  // Cancel any playing audio
+  if (window.speechSynthesis && window.speechSynthesis.speaking) {
+    window.speechSynthesis.cancel();
+  }
+
+  const q = state.questions[state.currentQ];
+  state.answers.push({
+    skillId: q.skill,
+    correct: selectedOption ? selectedOption.correct : false,
+    score:   selectedOption && selectedOption.correct ? 1 : 0
+  });
+
+  state.currentQ++;
+  loadQuestion();
 }
 
-// 結果表示
+/* ----------------------------------------------------------
+   SHOW RESULT
+   ---------------------------------------------------------- */
 function showResult() {
-    // 各技能のスコア計算（回答がない場合は0）
-    const skillScores = {
-        listening: (skillAnswers.listening || []).reduce((sum, score) => sum + score, 0),
-        reading: (skillAnswers.reading || []).reduce((sum, score) => sum + score, 0),
-        speaking: (skillAnswers.speaking || []).reduce((sum, score) => sum + score, 0),
-        writing: (skillAnswers.writing || []).reduce((sum, score) => sum + score, 0)
-    };
-    
-    // 総合スコア計算（診断方法に応じて）
-    const totalQuestions = getTotalQuestions();
-    let totalScore = 0;
-    Object.keys(skillScores).forEach(skill => {
-        totalScore += skillScores[skill];
+  // Tally scores per skill
+  const scores = { listening: 0, reading: 0, speaking: 0, writing: 0 };
+  state.answers.forEach(function(a) {
+    if (a.correct && scores[a.skillId] !== undefined) {
+      scores[a.skillId]++;
+    }
+  });
+
+  const totalCorrect = Object.values(scores).reduce(function(a, b) { return a + b; }, 0);
+  const totalQ       = state.questions.length;
+
+  // Determine level label
+  let levelJapanese = '初級';
+  if (state.method === 'auto' || state.level === 'advanced') {
+    if      (totalCorrect >= 16) levelJapanese = '上級';
+    else if (totalCorrect >= 12) levelJapanese = '中級〜上級';
+    else if (totalCorrect >=  8) levelJapanese = '中級';
+    else if (totalCorrect >=  4) levelJapanese = '初級〜中級';
+    else                          levelJapanese = '初級';
+  } else if (state.level === 'beginner') {
+    if      (totalCorrect === 5) levelJapanese = '初級（中級をおすすめ）';
+    else if (totalCorrect >=  3) levelJapanese = '初級';
+    else                          levelJapanese = '入門';
+  } else if (state.level === 'intermediate') {
+    if      (totalCorrect >=  8) levelJapanese = '中級〜上級';
+    else if (totalCorrect >=  6) levelJapanese = '中級';
+    else if (totalCorrect >=  4) levelJapanese = '初級〜中級';
+    else                          levelJapanese = '初級';
+  }
+
+  const levelEnglish = levelToEnglish(levelJapanese);
+  const stars        = starsFor(levelJapanese);
+  const resultId     = generateResultId();
+  state.resultId     = resultId;
+
+  // Calculate TOEIC only for auto (20 questions, 5 per skill)
+  let toeicScore = null;
+  let eikenLevel = null;
+  let cefrLevel  = null;
+  if (state.method === 'auto' || state.level === 'advanced') {
+    toeicScore = calcToeic(scores.listening, scores.reading, 5);
+    eikenLevel = toeicToEiken(toeicScore);
+    cefrLevel  = toeicToCefr(toeicScore);
+  }
+
+  const advice       = skillAdvice(scores);
+  const course       = getRecommendedCourse(state.goals);
+  const hasAiAppFail = state.goals.has('ai-app-failed');
+
+  // Build result HTML
+  let html = '';
+
+  // Top section
+  html += '<div class="result-top">';
+  html += '  <div class="result-celebration"><span class="material-icons">celebration</span></div>';
+  html += '  <h2>診断完了！</h2>';
+  html += '</div>';
+
+  // Result ID card
+  html += '<div class="result-id-card">';
+  html += '  <p class="result-id-label">診断結果ID <small>スタッフが事前に確認します</small></p>';
+  html += '  <div class="result-id-value">' + escapeHtml(resultId) + '</div>';
+  html += '  <button class="btn-copy" id="copy-result-id"><span class="material-icons">content_copy</span> コピー</button>';
+  html += '</div>';
+
+  // Level card
+  html += '<div class="level-card-result">';
+  html += '  <div class="level-badge">';
+  html += '    <div class="level-badge-stars">' + stars + '</div>';
+  html += '    <div class="level-badge-name">' + escapeHtml(levelJapanese) + '</div>';
+  html += '    <div class="level-badge-en">' + escapeHtml(levelEnglish) + '</div>';
+  html += '  </div>';
+  html += '  <div class="level-score">総合スコア: ' + totalCorrect + ' / ' + totalQ + '問正解</div>';
+  html += '  <p class="level-message">' + escapeHtml(motivationalMessage(levelJapanese)) + '</p>';
+  html += '</div>';
+
+  // Skill scores (auto / advanced)
+  if (state.method === 'auto' || state.level === 'advanced') {
+    html += '<div class="skill-scores-card">';
+    html += '  <h3>4技能スコア</h3>';
+    html += '  <div class="skill-bar-list">';
+
+    const skillConfig = [
+      { id: 'listening', label: 'リスニング', fillClass: 'fill-listening' },
+      { id: 'reading',   label: 'リーディング', fillClass: 'fill-reading' },
+      { id: 'speaking',  label: 'スピーキング', fillClass: 'fill-speaking' },
+      { id: 'writing',   label: 'ライティング', fillClass: 'fill-writing' }
+    ];
+
+    skillConfig.forEach(function(sc) {
+      const correct = scores[sc.id];
+      const pct     = Math.round((correct / 5) * 100);
+      html += '<div class="skill-bar-item">';
+      html += '  <div class="skill-bar-label">' + sc.label + '</div>';
+      html += '  <div class="skill-bar-track">';
+      html += '    <div class="skill-bar-fill ' + sc.fillClass + '" style="width:' + pct + '%"></div>';
+      html += '  </div>';
+      html += '  <div class="skill-bar-score">' + correct + '/5</div>';
+      html += '</div>';
     });
-    
-    // 最大スコアを計算（各問題3点満点）
-    const maxScore = totalQuestions * 3;
-    
-    // 総合レベル判定（診断方法に応じて調整）
-    let overallLevel;
-    if (selectedMethod === 'auto') {
-        // 自動判定: 4技能すべてを使用
-        overallLevel = calculateOverallLevel(skillScores);
-    } else {
-        // レベル選択: 簡易的な判定
-        const percentage = (totalScore / maxScore) * 100;
-        if (percentage >= 80) {
-            overallLevel = { japanese: "上級", english: "Advanced", stars: 5 };
-        } else if (percentage >= 60) {
-            overallLevel = { japanese: "中級", english: "Intermediate", stars: 3 };
-        } else if (percentage >= 40) {
-            overallLevel = { japanese: "初級～中級", english: "Beginner-Intermediate", stars: 2 };
-        } else {
-            overallLevel = { japanese: "初級", english: "Beginner", stars: 1 };
-        }
-    }
-    
-    // TOEICスコア計算（自動判定のみ）
-    let toeicScore = null;
-    let eikenLevel = null;
-    let cefrLevel = null;
-    if (selectedMethod === 'auto') {
-        toeicScore = calculateTOEICScore(skillScores);
-        eikenLevel = calculateEikenLevel(toeicScore.total);
-        cefrLevel = calculateCEFRLevel(toeicScore.total);
-    }
-    
-    const mainPurpose = (window.selectedPurposes && window.selectedPurposes[0]) || 'other';
-    const course = coursesData[mainPurpose] || coursesData.other;
-    const resultId = generateResultId();
-    
-    resultData = {
-        level: overallLevel,
-        skillScores: skillScores,
-        totalScore: totalScore,
-        maxScore: totalQuestions,
-        toeic: toeicScore,
-        eiken: eikenLevel,
-        cefr: cefrLevel,
-        course: course,
-        resultId: resultId
-    };
-    
-    // モチベーション向上のメッセージ
-    const motivationalMessages = {
-        1: "素晴らしいスタートです！これから一緒に英語力を伸ばしていきましょう！",
-        2: "良い基礎ができています！次のステップに進みましょう！",
-        3: "しっかりとした英語力があります！さらに上を目指しましょう！",
-        4: "高い英語力を持っています！実践的な場面で活かしていきましょう！",
-        5: "素晴らしい英語力です！さらに磨きをかけて、ネイティブレベルを目指しましょう！"
-    };
-    
-    // 診断結果IDを最上部に表示（要件定義書に基づく）
-    const resultScreen = document.getElementById('result-screen');
-    const container = resultScreen.querySelector('.container');
-    
-    // 既存の診断結果IDセクション（最上部）を削除
-    const existingResultIdTop = document.querySelector('.result-id-section-top');
-    if (existingResultIdTop) {
-        existingResultIdTop.remove();
-    }
-    
-    // 最上部に診断結果IDセクションを追加
-    const resultIdHTML = `
-        <div class="result-id-section-top">
-            <h3>📋 診断結果ID</h3>
-            <div class="result-id-display">
-                <span id="result-id-top" style="font-size: 24px; font-weight: bold; color: #FF6B6B; letter-spacing: 2px; font-family: monospace;">${resultId}</span>
-                <button class="btn-copy" id="copy-btn-top">📋 コピー</button>
-            </div>
-            <p class="result-id-note">※来校時にこのIDを提示してください<br>※有効期限: 90日間</p>
-        </div>
-    `;
-    container.insertAdjacentHTML('afterbegin', resultIdHTML);
-    
-    // コピーボタンのイベントリスナー（最上部）
-    const copyBtnTop = document.getElementById('copy-btn-top');
-    if (copyBtnTop) {
-        copyBtnTop.addEventListener('click', function() {
-            const resultIdText = document.getElementById('result-id-top').textContent;
-            navigator.clipboard.writeText(resultIdText).then(function() {
-                alert('診断結果IDをコピーしました: ' + resultIdText);
-            });
+
+    html += '  </div>';
+    html += '</div>';
+
+    // Certification card
+    html += '<div class="certification-card">';
+    html += '  <h3>推定レベル認定</h3>';
+    html += '  <table class="cert-table">';
+    html += '    <tr><td>TOEIC換算</td><td>' + toeicScore + ' 点</td></tr>';
+    html += '    <tr><td>英検目安</td><td>' + escapeHtml(eikenLevel) + '</td></tr>';
+    html += '    <tr><td>CEFR</td><td>' + escapeHtml(cefrLevel) + '</td></tr>';
+    html += '  </table>';
+    html += '</div>';
+  }
+
+  // Advice
+  html += '<div class="advice-card">';
+  html += '  <h3>アドバイス</h3>';
+  html += '  <div class="advice-list">';
+  advice.forEach(function(item) {
+    html += '  <div class="advice-item">';
+    html += '    <span class="material-icons">lightbulb</span>';
+    html += '    <div><strong>' + escapeHtml(item.skill) + '：</strong>' + escapeHtml(item.text) + '</div>';
+    html += '  </div>';
+  });
+  html += '  </div>';
+  html += '</div>';
+
+  // AI app failed message
+  if (hasAiAppFail) {
+    html += '<div class="ai-message-card">';
+    html += '  <h3><span class="material-icons" style="vertical-align:middle;margin-right:6px;font-size:20px;">info</span>アプリが続かなかったあなたへ</h3>';
+    html += '  <p>英語アプリは手軽な反面、一人では継続が難しく、「実際に話せない」という課題が残りがちです。対面レッスンでは、プロ講師がリアルタイムで発音・表現を修正し、あなたのモチベーションに合わせた学習計画を一緒に立てます。まずは無料体験で違いを実感してください。</p>';
+    html += '</div>';
+  }
+
+  // Course recommendation
+  html += '<div class="course-card-result">';
+  html += '  <h3>おすすめコース</h3>';
+  html += '  <div class="course-header">';
+  html += '    <div class="course-icon"><span class="material-icons">' + escapeHtml(course.icon) + '</span></div>';
+  html += '    <div>';
+  html += '      <div class="course-name">' + escapeHtml(course.name) + '</div>';
+  html += '      <span class="course-tag">' + escapeHtml(course.tag) + '</span>';
+  html += '    </div>';
+  html += '  </div>';
+  html += '  <p class="course-desc">' + escapeHtml(course.desc) + '</p>';
+  html += '</div>';
+
+  // CTA
+  html += '<div class="result-cta">';
+  html += '  <h3>無料体験レッスン・カウンセリング</h3>';
+  html += '  <p>診断結果をもとにぴったりのコースをご提案します</p>';
+  html += '  <div class="cta-benefits">';
+  html += '    <span><span class="material-icons">check</span> 無料体験レッスン（40分）</span>';
+  html += '    <span><span class="material-icons">check</span> 無料カウンセリング（30分）</span>';
+  html += '    <span><span class="material-icons">check</span> 診断結果IDで来校もスムーズ</span>';
+  html += '  </div>';
+  html += '  <button class="btn-primary btn-block" id="result-trial-btn">無料体験レッスンを予約する</button>';
+  html += '  <button class="btn-primary btn-block btn-secondary-style" id="result-counseling-btn">無料カウンセリングを予約する</button>';
+  html += '  <button class="btn-text" id="result-contact-btn">その他のお問い合わせ</button>';
+  html += '</div>';
+
+  const resultContent = document.getElementById('result-content');
+  if (resultContent) resultContent.innerHTML = html;
+
+  showScreen('screen-result');
+
+  // Attach result button handlers
+  const trialBtn = document.getElementById('result-trial-btn');
+  if (trialBtn) {
+    trialBtn.addEventListener('click', function() {
+      prefillContact('trial-lesson');
+    });
+  }
+
+  const counselingBtn = document.getElementById('result-counseling-btn');
+  if (counselingBtn) {
+    counselingBtn.addEventListener('click', function() {
+      prefillContact('counseling');
+    });
+  }
+
+  const contactBtn = document.getElementById('result-contact-btn');
+  if (contactBtn) {
+    contactBtn.addEventListener('click', function() {
+      prefillContact('other');
+    });
+  }
+
+  const copyBtn = document.getElementById('copy-result-id');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', function() {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(state.resultId).then(function() {
+          copyBtn.innerHTML = '<span class="material-icons">check</span> コピーしました';
+          setTimeout(function() {
+            copyBtn.innerHTML = '<span class="material-icons">content_copy</span> コピー';
+          }, 2000);
         });
-    }
-    
-    // 結果画面に表示
-    document.getElementById('stars-display').textContent = '⭐'.repeat(overallLevel.stars) + '☆'.repeat(5 - overallLevel.stars);
-    document.getElementById('level-japanese').textContent = overallLevel.japanese;
-    document.getElementById('level-english').textContent = `(${overallLevel.english})`;
-    document.getElementById('course-icon').textContent = course.icon;
-    document.getElementById('course-name').textContent = course.name;
-    document.getElementById('course-level').textContent = `(${course.level})`;
-    document.getElementById('result-id').textContent = resultId;
-    
-    // 総合スコア表示を追加（最大スコアを正しく計算）
-    const resultCard = document.querySelector('.result-card');
-    const maxScoreForDisplay = totalQuestions * 3; // 各問題3点満点
-    const totalScoreHTML = `
-        <div class="total-score-section">
-            <h4>総合スコア: ${totalScore}/${maxScoreForDisplay}点</h4>
-        </div>
-    `;
-    if (!document.querySelector('.total-score-section')) {
-        resultCard.insertAdjacentHTML('afterbegin', totalScoreHTML);
-    } else {
-        document.querySelector('.total-score-section h4').textContent = `総合スコア: ${totalScore}/${maxScoreForDisplay}点`;
-    }
-    
-    // モチベーションメッセージを追加
-    const motivationalMessage = motivationalMessages[overallLevel.stars] || motivationalMessages[3];
-    if (!document.querySelector('.motivational-message')) {
-        const messageHTML = `<div class="motivational-message">${motivationalMessage}</div>`;
-        resultCard.insertAdjacentHTML('afterbegin', messageHTML);
-    }
-    
-    // できることリスト
-    const benefitsList = document.getElementById('benefits-list');
-    benefitsList.innerHTML = '';
-    course.benefits.forEach(benefit => {
-        const li = document.createElement('li');
-        li.textContent = benefit;
-        benefitsList.appendChild(li);
+      } else {
+        // Fallback: create a temporary textarea and use a hidden input to copy
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = state.resultId || '';
+          ta.style.position = 'fixed';
+          ta.style.opacity  = '0';
+          ta.style.top      = '0';
+          ta.style.left     = '0';
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          // Wrapped in try/catch — this path is only reached on very old browsers
+          // where navigator.clipboard is unavailable; no modern alternative exists.
+          const success = window.document.execCommand('copy'); // eslint-disable-line
+          document.body.removeChild(ta);
+          if (success) {
+            copyBtn.innerHTML = '<span class="material-icons">check</span> コピーしました';
+            setTimeout(function() {
+              copyBtn.innerHTML = '<span class="material-icons">content_copy</span> コピー';
+            }, 2000);
+          }
+        } catch (_) {
+          // Silent fail — clipboard unavailable in this environment
+        }
+      }
     });
-    
-    // アドバイス生成（自動判定のみ、またはフェーズ2以降）
-    let advice = null;
-    if (selectedMethod === 'auto') {
-        advice = generateAdvice(skillScores);
-    }
-    
-    // 4技能スコア表示とレベル認定（自動判定の場合のみ表示）
-    let skillScoresHTML = '';
-    if (selectedMethod === 'auto') {
-        const maxScorePerSkill = 5; // 自動判定: 各技能5問×3点 = 15点満点だが、表示は5点満点
-        skillScoresHTML = `
-            <div class="skill-scores-section">
-                <h4>4技能スコア</h4>
-                <div class="skill-scores-grid">
-                    <div class="skill-score-item">
-                        <span class="skill-icon">🎧</span>
-                        <span class="skill-name">リスニング</span>
-                        <span class="skill-score">${Math.min(Math.ceil(skillScores.listening / 3), maxScorePerSkill)}/${maxScorePerSkill}</span>
-                    </div>
-                    <div class="skill-score-item">
-                        <span class="skill-icon">📖</span>
-                        <span class="skill-name">リーディング</span>
-                        <span class="skill-score">${Math.min(Math.ceil(skillScores.reading / 3), maxScorePerSkill)}/${maxScorePerSkill}</span>
-                    </div>
-                    <div class="skill-score-item">
-                        <span class="skill-icon">🗣️</span>
-                        <span class="skill-name">スピーキング</span>
-                        <span class="skill-score">${Math.min(Math.ceil(skillScores.speaking / 3), maxScorePerSkill)}/${maxScorePerSkill}</span>
-                    </div>
-                    <div class="skill-score-item">
-                        <span class="skill-icon">✍️</span>
-                        <span class="skill-name">ライティング</span>
-                        <span class="skill-score">${Math.min(Math.ceil(skillScores.writing / 3), maxScorePerSkill)}/${maxScorePerSkill}</span>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="level-certifications">
-                <h4>レベル認定</h4>
-                <div class="certification-item">
-                    <span class="cert-label">TOEIC:</span>
-                    <span class="cert-value">${toeicScore.total}点 (L:${toeicScore.listening} R:${toeicScore.reading})</span>
-                </div>
-                <div class="certification-item">
-                    <span class="cert-label">英検:</span>
-                    <span class="cert-value">${eikenLevel.level} (${eikenLevel.description})</span>
-                </div>
-                <div class="certification-item">
-                    <span class="cert-label">CEFR:</span>
-                    <span class="cert-value">${cefrLevel.level} (${cefrLevel.description})</span>
-                </div>
-            </div>
-        `;
-        
-        if (advice) {
-            skillScoresHTML += `
-                <div class="advice-section">
-                    <h4>📝 あなたへのアドバイス</h4>
-                    <div class="advice-message">${advice.message}</div>
-                </div>
-            `;
-        }
-    }
-    
-    // 結果画面に4技能スコアとレベル認定を追加（自動判定の場合のみ）
-    if (selectedMethod === 'auto' && !document.querySelector('.skill-scores-section')) {
-        resultCard.insertAdjacentHTML('beforeend', skillScoresHTML);
-    } else if (selectedMethod !== 'auto') {
-        // レベル選択の場合、既存のセクションを削除
-        const existingSection = document.querySelector('.skill-scores-section');
-        if (existingSection) {
-            existingSection.remove();
-        }
-        const existingCert = document.querySelector('.level-certifications');
-        if (existingCert) {
-            existingCert.remove();
-        }
-    }
-    
-    // AIアプリで続かなかった人へのメッセージ（条件付き表示）
-    // 用途選択で「AIアプリを試したけど続かなかった」を選んだ場合のみ表示
-    // または、ランディング画面の1.3セクションから診断を開始した場合に表示
-    const shouldShowAiAppMessage = window.selectedPurposes && window.selectedPurposes.includes('ai-app-failed');
-    
-    if (shouldShowAiAppMessage) {
-        const aiAppMessageHTML = `
-            <div class="ai-app-result-section">
-                <h4>💡 対面レッスンがおすすめ！</h4>
-                <p class="ai-app-intro">AIアプリで続かなかったあなた。<br>対面レッスンなら変わる理由がある</p>
-                <div class="ai-app-benefits">
-                    <div>✨ 仲間と一緒に学べる</div>
-                    <div>✨ モチベーションが維持できる</div>
-                    <div>✨ リアルな反応で成長を実感</div>
-                </div>
-                <div class="ai-app-stats">
-                    <p><strong>継続率:</strong> AIアプリ 20% → 対面 85%</p>
-                    <p><strong>モチベーション:</strong> AIアプリ 30% → 対面 90%</p>
-                </div>
-                <button class="btn-primary ai-app-cta">無料体験レッスンを予約する</button>
-            </div>
-        `;
-        
-        // 結果画面にAIアプリメッセージを追加（CTAセクションの前に）
-        if (!document.querySelector('.ai-app-result-section')) {
-            resultCard.insertAdjacentHTML('beforeend', aiAppMessageHTML);
-            
-            // AIアプリメッセージ内のCTAボタンのイベントリスナー
-            const aiAppCtaBtn = document.querySelector('.ai-app-cta');
-            if (aiAppCtaBtn) {
-                aiAppCtaBtn.addEventListener('click', function() {
-                    document.getElementById('inquiry-type').value = 'trial-lesson';
-                    showScreen('contact-screen');
-                });
-            }
-        }
-    }
-    
-    // 問い合わせフォームにIDを設定
-    document.getElementById('result-id-input').value = resultId;
-    
-    // 既存の診断結果IDセクションを非表示（最上部に表示するため）
-    const existingResultIdSection = document.querySelector('.result-id-section');
-    if (existingResultIdSection) {
-        existingResultIdSection.style.display = 'none';
-    }
-    
-    showScreen('result-screen');
+  }
 }
 
-// フォームバリデーション
-function validateForm() {
-    let isValid = true;
-    
-    const name = document.getElementById('name').value.trim();
-    const email = document.getElementById('email').value.trim();
-    const phone = document.getElementById('phone').value.trim();
-    
-    // 名前のバリデーション
-    if (name === '') {
-        document.getElementById('name-error').textContent = 'お名前を入力してください';
-        isValid = false;
-    } else {
-        document.getElementById('name-error').textContent = '';
-    }
-    
-    // メールアドレスのバリデーション
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (email === '') {
-        document.getElementById('email-error').textContent = 'メールアドレスを入力してください';
-        isValid = false;
-    } else if (!emailRegex.test(email)) {
-        document.getElementById('email-error').textContent = '正しいメールアドレスを入力してください';
-        isValid = false;
-    } else {
-        document.getElementById('email-error').textContent = '';
-    }
-    
-    // 電話番号のバリデーション
-    const phoneRegex = /^[\d-]+$/;
-    if (phone === '') {
-        document.getElementById('phone-error').textContent = '電話番号を入力してください';
-        isValid = false;
-    } else if (!phoneRegex.test(phone.replace(/-/g, ''))) {
-        document.getElementById('phone-error').textContent = '正しい電話番号を入力してください';
-        isValid = false;
-    } else {
-        document.getElementById('phone-error').textContent = '';
-    }
-    
-    return isValid;
+/* ----------------------------------------------------------
+   CONTACT PREFILL
+   ---------------------------------------------------------- */
+function prefillContact(type) {
+  const resultIdField = document.getElementById('f-result-id');
+  if (resultIdField) {
+    resultIdField.value = state.resultId || '';
+  }
+
+  const typeField = document.getElementById('f-type');
+  if (typeField && type) {
+    typeField.value = type;
+  }
+
+  showScreen('screen-contact');
 }
+
+/* ----------------------------------------------------------
+   FORM VALIDATION
+   ---------------------------------------------------------- */
+function validateForm() {
+  let valid = true;
+
+  const name      = document.getElementById('f-name');
+  const nameErr   = document.getElementById('f-name-err');
+  const email     = document.getElementById('f-email');
+  const emailErr  = document.getElementById('f-email-err');
+  const phone     = document.getElementById('f-phone');
+  const phoneErr  = document.getElementById('f-phone-err');
+
+  // Clear previous errors
+  [name, email, phone].forEach(function(el) { if (el) el.classList.remove('error'); });
+  [nameErr, emailErr, phoneErr].forEach(function(el) { if (el) el.textContent = ''; });
+
+  // Name
+  if (!name || !name.value.trim()) {
+    if (name) name.classList.add('error');
+    if (nameErr) nameErr.textContent = 'お名前を入力してください';
+    valid = false;
+  }
+
+  // Email
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!email || !emailRegex.test(email.value.trim())) {
+    if (email) email.classList.add('error');
+    if (emailErr) emailErr.textContent = '有効なメールアドレスを入力してください';
+    valid = false;
+  }
+
+  // Phone
+  const phoneRegex = /^[\d\-+()\s]+$/;
+  if (!phone || !phone.value.trim() || !phoneRegex.test(phone.value.trim())) {
+    if (phone) phone.classList.add('error');
+    if (phoneErr) phoneErr.textContent = '有効な電話番号を入力してください（数字とハイフンのみ）';
+    valid = false;
+  }
+
+  return valid;
+}
+
+/* ----------------------------------------------------------
+   HTML ESCAPE UTILITIES
+   ---------------------------------------------------------- */
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escapeAttr(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;');
+}
+
+/* ----------------------------------------------------------
+   RESET STATE
+   ---------------------------------------------------------- */
+function resetState() {
+  state.method    = null;
+  state.level     = null;
+  state.goals     = new Set();
+  state.questions = [];
+  state.currentQ  = 0;
+  state.answers   = [];
+  state.resultId  = null;
+}
+
+/* ----------------------------------------------------------
+   MAIN: DOMContentLoaded
+   ---------------------------------------------------------- */
+document.addEventListener('DOMContentLoaded', function() {
+
+  /* ---- Landing ---- */
+  const heroStartBtn = document.getElementById('hero-start-btn');
+  if (heroStartBtn) {
+    heroStartBtn.addEventListener('click', function() {
+      showScreen('screen-method');
+    });
+  }
+
+  const ctaStartBtn = document.getElementById('cta-start-btn');
+  if (ctaStartBtn) {
+    ctaStartBtn.addEventListener('click', function() {
+      showScreen('screen-method');
+    });
+  }
+
+  const ctaTrialBtn = document.getElementById('cta-trial-btn');
+  if (ctaTrialBtn) {
+    ctaTrialBtn.addEventListener('click', function() {
+      prefillContact('trial-lesson');
+    });
+  }
+
+  const navTrialBtn = document.getElementById('nav-trial-btn');
+  if (navTrialBtn) {
+    navTrialBtn.addEventListener('click', function() {
+      prefillContact('trial-lesson');
+    });
+  }
+
+  /* ---- Method Screen ---- */
+  const cardAuto  = document.getElementById('card-auto');
+  const cardLevel = document.getElementById('card-level');
+  const methodNextBtn = document.getElementById('method-next-btn');
+  const methodBackBtn = document.getElementById('method-back-btn');
+
+  if (cardAuto) {
+    cardAuto.addEventListener('click', function(e) {
+      e.stopPropagation();
+      state.method = 'auto';
+      cardAuto.classList.add('selected');
+      if (cardLevel) cardLevel.classList.remove('selected');
+      if (methodNextBtn) methodNextBtn.disabled = false;
+    });
+  }
+
+  if (cardLevel) {
+    cardLevel.addEventListener('click', function(e) {
+      e.stopPropagation();
+      state.method = 'level-select';
+      cardLevel.classList.add('selected');
+      if (cardAuto) cardAuto.classList.remove('selected');
+      if (methodNextBtn) methodNextBtn.disabled = false;
+    });
+  }
+
+  if (methodNextBtn) {
+    methodNextBtn.addEventListener('click', function() {
+      if (state.method === 'auto') {
+        showScreen('screen-goal');
+      } else if (state.method === 'level-select') {
+        showScreen('screen-level');
+      }
+    });
+  }
+
+  if (methodBackBtn) {
+    methodBackBtn.addEventListener('click', function() {
+      showScreen('screen-landing');
+    });
+  }
+
+  /* ---- Level Screen ---- */
+  const levelNextBtn = document.getElementById('level-next-btn');
+  const levelBackBtn = document.getElementById('level-back-btn');
+
+  const levelCards = document.querySelectorAll('.level-card');
+  levelCards.forEach(function(card) {
+    card.addEventListener('click', function(e) {
+      e.stopPropagation();
+      levelCards.forEach(function(c) { c.classList.remove('selected'); });
+      card.classList.add('selected');
+      state.level = card.getAttribute('data-level');
+      if (levelNextBtn) levelNextBtn.disabled = false;
+    });
+  });
+
+  if (levelNextBtn) {
+    levelNextBtn.addEventListener('click', function() {
+      showScreen('screen-goal');
+    });
+  }
+
+  if (levelBackBtn) {
+    levelBackBtn.addEventListener('click', function() {
+      showScreen('screen-method');
+    });
+  }
+
+  /* ---- Goal Screen ---- */
+  const goalNextBtn = document.getElementById('goal-next-btn');
+  const goalBackBtn = document.getElementById('goal-back-btn');
+
+  const goalCards = document.querySelectorAll('.goal-card');
+  goalCards.forEach(function(card) {
+    card.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const goal = card.getAttribute('data-goal');
+      if (state.goals.has(goal)) {
+        state.goals.delete(goal);
+        card.classList.remove('selected');
+      } else {
+        state.goals.add(goal);
+        card.classList.add('selected');
+      }
+      if (goalNextBtn) {
+        goalNextBtn.disabled = state.goals.size === 0;
+      }
+    });
+  });
+
+  if (goalNextBtn) {
+    goalNextBtn.addEventListener('click', function() {
+      startQuiz();
+    });
+  }
+
+  if (goalBackBtn) {
+    goalBackBtn.addEventListener('click', function() {
+      if (state.method === 'auto') {
+        showScreen('screen-method');
+      } else {
+        showScreen('screen-level');
+      }
+    });
+  }
+
+  /* ---- Contact Screen ---- */
+  const contactBackBtn = document.getElementById('contact-back-btn');
+  if (contactBackBtn) {
+    contactBackBtn.addEventListener('click', function() {
+      if (state.resultId) {
+        showScreen('screen-result');
+      } else {
+        showScreen('screen-landing');
+      }
+    });
+  }
+
+  const contactForm = document.getElementById('contact-form');
+  if (contactForm) {
+    contactForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      if (validateForm()) {
+        showScreen('screen-thanks');
+      }
+    });
+  }
+
+  /* ---- Thanks Screen ---- */
+  const thanksHomeBtn = document.getElementById('thanks-home-btn');
+  if (thanksHomeBtn) {
+    thanksHomeBtn.addEventListener('click', function() {
+      resetState();
+
+      // Reset method cards
+      const cAuto  = document.getElementById('card-auto');
+      const cLevel = document.getElementById('card-level');
+      const mNext  = document.getElementById('method-next-btn');
+      if (cAuto)  cAuto.classList.remove('selected');
+      if (cLevel) cLevel.classList.remove('selected');
+      if (mNext)  mNext.disabled = true;
+
+      // Reset level cards
+      document.querySelectorAll('.level-card').forEach(function(c) {
+        c.classList.remove('selected');
+      });
+      const lNext = document.getElementById('level-next-btn');
+      if (lNext) lNext.disabled = true;
+
+      // Reset goal cards
+      document.querySelectorAll('.goal-card').forEach(function(c) {
+        c.classList.remove('selected');
+      });
+      const gNext = document.getElementById('goal-next-btn');
+      if (gNext) gNext.disabled = true;
+
+      // Reset contact form
+      const form = document.getElementById('contact-form');
+      if (form) form.reset();
+      const resultIdField = document.getElementById('f-result-id');
+      if (resultIdField) resultIdField.value = '';
+
+      showScreen('screen-landing');
+    });
+  }
+
+});
