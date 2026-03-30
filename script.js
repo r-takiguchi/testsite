@@ -508,6 +508,91 @@ function getRecommendedCourse(goals) {
 }
 
 /* ----------------------------------------------------------
+   ENGLISH TYPE DIAGNOSIS
+   最も正解率が高い技能 → タイプ判定
+   ---------------------------------------------------------- */
+function getEnglishType(scores) {
+  var skillKeys = ['listening', 'reading', 'speaking', 'writing'];
+  var maxScore = -1;
+  var strongest = 'listening';
+  skillKeys.forEach(function(sk) {
+    if (scores[sk] > maxScore) { maxScore = scores[sk]; strongest = sk; }
+  });
+
+  var types = {
+    listening: {
+      name: '実践型',
+      en: 'Practical Learner',
+      icon: 'hearing',
+      color: '#1565C0',
+      desc: 'リスニング力が高く、英語の音とリズムを直感的に掴む力があります。実際の会話場面でも素早く反応できる「聴く力」が武器です。',
+      strength: '英語音声への適応力・場の空気を読む力',
+      growth: 'スピーキングを鍛えることで、優れたリスニング力と合わさって会話力が一気に伸びます。'
+    },
+    reading: {
+      name: '分析型',
+      en: 'Analytical Learner',
+      icon: 'psychology',
+      color: '#2E7D32',
+      desc: 'リーディング力が高く、文章から正確に意味を読み取る分析力に優れています。語彙力と論理的思考が強みで、ビジネス文書にも活かせます。',
+      strength: '正確な文法・語彙の理解力と読解スピード',
+      growth: 'スピーキング練習で「知っているけど話せない」を解消するのが最短ルートです。'
+    },
+    speaking: {
+      name: '会話型',
+      en: 'Communicator',
+      icon: 'record_voice_over',
+      color: '#D62B4B',
+      desc: 'スピーキング力が高く、英語でのコミュニケーションに積極的です。間違いを恐れずに伝えようとする姿勢が英語上達の最大の武器になります。',
+      strength: '英語を話す積極性と相手への伝達力',
+      growth: 'リーディング・ライティングを強化すると、ビジネス英語や資格にも対応できるようになります。'
+    },
+    writing: {
+      name: '理論型',
+      en: 'Structured Learner',
+      icon: 'edit_note',
+      color: '#6A1B9A',
+      desc: 'ライティング力が高く、文法と表現を正確に使う力に優れています。論理的に英語を組み立てる能力が、メール・報告書などのビジネス英語に直結します。',
+      strength: '正確な英語表現と文法構造の組み立て力',
+      growth: '学んだ表現を口に出す練習（スピーキング）が、英語力全体を引き上げます。'
+    }
+  };
+
+  return types[strongest];
+}
+
+/* ----------------------------------------------------------
+   GROWTH PREDICTION
+   CEFRレベルから3ヶ月・6ヶ月後の成長予測を返す
+   ---------------------------------------------------------- */
+function getGrowthPrediction(levelEnglish, cefrLevel) {
+  // auto以外はlevelEnglishからCEFR推定
+  var cefr = cefrLevel;
+  if (!cefr) {
+    var map = {
+      'Beginner':          'A1',
+      'Elementary':        'A2',
+      'Pre-Intermediate':  'B1',
+      'Intermediate':      'B1',
+      'Upper-Intermediate':'B2',
+      'Advanced':          'C1'
+    };
+    cefr = map[levelEnglish] || 'A2';
+  }
+
+  var predictions = {
+    'A1': { current: 'A1', month3: 'A2', month6: 'B1', note: '基礎を固めながら日常会話を習得できます' },
+    'A2': { current: 'A2', month3: 'B1', month6: 'B2', note: '日常会話から実用的な英語表現へ' },
+    'B1': { current: 'B1', month3: 'B2', month6: 'C1', note: '実用英語からビジネス英語へ飛躍できます' },
+    'B2': { current: 'B2', month3: 'C1', month6: 'C2', note: 'ビジネス英語からネイティブ水準へ' },
+    'C1': { current: 'C1', month3: 'C2', month6: 'C2+', note: 'ネイティブ水準の維持・さらなる洗練へ' },
+    'C2': { current: 'C2', month3: 'C2+', month6: 'Native', note: 'すでにトップレベル。専門性と自然さを極めましょう' }
+  };
+
+  return predictions[cefr] || predictions['A2'];
+}
+
+/* ----------------------------------------------------------
    AUDIO PLAYBACK (Web Speech API — best-voice selection)
    ---------------------------------------------------------- */
 
@@ -846,6 +931,8 @@ function showResult() {
   const advice       = skillAdvice(scores);
   const course       = getRecommendedCourse(state.goals);
   const hasAiAppFail = state.goals.has('ai-app-failed');
+  const engType      = getEnglishType(scores);
+  const growth       = getGrowthPrediction(levelEnglish, cefrLevel);
 
   const personalMsg = goalPersonalMessage(state.goals, levelJapanese);
 
@@ -875,6 +962,22 @@ function showResult() {
   html += '<div class="personal-msg-card">';
   html += '  <div class="personal-msg-icon"><span class="material-icons">tips_and_updates</span></div>';
   html += '  <p>' + escapeHtml(personalMsg) + '</p>';
+  html += '</div>';
+
+  // ── 3b. 英語タイプ診断 ────────────────────────────────
+  html += '<div class="english-type-card" style="--type-color:' + engType.color + '">';
+  html += '  <div class="english-type-header">';
+  html += '    <span class="material-icons english-type-icon">' + escapeHtml(engType.icon) + '</span>';
+  html += '    <div>';
+  html += '      <div class="english-type-label">あなたの英語タイプ</div>';
+  html += '      <div class="english-type-name">' + escapeHtml(engType.name) + '<span class="english-type-en"> / ' + escapeHtml(engType.en) + '</span></div>';
+  html += '    </div>';
+  html += '  </div>';
+  html += '  <p class="english-type-desc">' + escapeHtml(engType.desc) + '</p>';
+  html += '  <div class="english-type-rows">';
+  html += '    <div class="english-type-row"><span class="material-icons">star</span><div><strong>強み：</strong>' + escapeHtml(engType.strength) + '</div></div>';
+  html += '    <div class="english-type-row"><span class="material-icons">trending_up</span><div><strong>伸ばし方：</strong>' + escapeHtml(engType.growth) + '</div></div>';
+  html += '  </div>';
   html += '</div>';
 
   // ── 4. 4技能スコア（自動 or 上級のみ）────────────────
@@ -912,6 +1015,31 @@ function showResult() {
     html += '  </table>';
     html += '</div>';
   }
+
+  // ── 4b. 英語成長予測タイムライン ─────────────────────
+  html += '<div class="growth-timeline">';
+  html += '  <h3><span class="material-icons">trending_up</span>EigoPlus受講後の成長予測</h3>';
+  html += '  <p class="growth-note">' + escapeHtml(growth.note) + '</p>';
+  html += '  <div class="growth-steps">';
+  html += '    <div class="growth-step growth-step--current">';
+  html += '      <div class="growth-step-dot"></div>';
+  html += '      <div class="growth-step-label">現在</div>';
+  html += '      <div class="growth-step-level">' + escapeHtml(growth.current) + '</div>';
+  html += '    </div>';
+  html += '    <div class="growth-step-arrow"><span class="material-icons">arrow_forward</span><span class="growth-step-months">3ヶ月後</span></div>';
+  html += '    <div class="growth-step growth-step--month3">';
+  html += '      <div class="growth-step-dot"></div>';
+  html += '      <div class="growth-step-label">目標①</div>';
+  html += '      <div class="growth-step-level">' + escapeHtml(growth.month3) + '</div>';
+  html += '    </div>';
+  html += '    <div class="growth-step-arrow"><span class="material-icons">arrow_forward</span><span class="growth-step-months">6ヶ月後</span></div>';
+  html += '    <div class="growth-step growth-step--month6">';
+  html += '      <div class="growth-step-dot"></div>';
+  html += '      <div class="growth-step-label">目標②</div>';
+  html += '      <div class="growth-step-level">' + escapeHtml(growth.month6) + '</div>';
+  html += '    </div>';
+  html += '  </div>';
+  html += '</div>';
 
   // ── 5. アドバイス ────────────────────────────────────
   html += '<div class="advice-card">';
@@ -967,8 +1095,8 @@ function showResult() {
 
   // ── 8. メインCTA（最重要・感情が最高潮の場所）───────
   html += '<div class="result-cta">';
-  html += '  <div class="result-cta-headline">次のステップへ進みましょう</div>';
-  html += '  <p class="result-cta-sub">診断結果をもとに、スタッフがぴったりのコースをご提案します。<br>無料なので、まずは話を聞くだけでも大丈夫です。</p>';
+  html += '  <div class="result-cta-headline">あなた専用の英語プランを作成します</div>';
+  html += '  <p class="result-cta-sub">診断結果をもとに、プロ講師があなた専用の学習プランを無料で作成します。<br>まずは40分の無料体験レッスンから始めてみましょう。</p>';
   html += '  <div class="cta-trust-row">';
   html += '    <span><span class="material-icons">check_circle</span>完全無料</span>';
   html += '    <span><span class="material-icons">check_circle</span>勧誘なし</span>';
