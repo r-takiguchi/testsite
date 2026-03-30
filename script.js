@@ -441,6 +441,37 @@ function motivationalMessage(level) {
   return map[level] || 'あなたの目標に向けて、一緒に取り組みましょう！';
 }
 
+// 目標ごとのパーソナライズメッセージ
+function goalPersonalMessage(goals, level) {
+  if (goals.has('business') || goals.has('meeting') || goals.has('presentation') || goals.has('career')) {
+    const msgs = {
+      '入門': 'ビジネスの現場で使える英語を、基礎からしっかり身につけましょう。最初の一歩が一番大切です。',
+      '初級': 'ビジネス英語の土台づくりに最適なタイミングです。メール・電話対応から始めましょう。',
+      '初級〜中級': 'あと一段階上がれば、ビジネスの場で自信を持って発言できます。一緒に突破しましょう！',
+      '中級': 'ビジネスシーンで十分戦える英語力があります。会議・交渉でさらに差をつけましょう。',
+      '中級〜上級': 'ビジネス英語としてはすでに高水準。ネイティブが使う自然な表現で磨きをかけましょう。',
+      '上級': 'グローバルな舞台で活躍できる英語力をお持ちです。さらなる洗練を目指しましょう。'
+    };
+    return msgs[level] || msgs['中級'];
+  }
+  if (goals.has('toeic')) {
+    return 'TOEIC対策には、現在のレベルから次のスコア帯を狙う集中プランが効果的です。無料体験で作戦を立てましょう。';
+  }
+  if (goals.has('eiken')) {
+    return '英検合格には4技能バランスの強化が鍵。現在の弱点を把握して、最短ルートで合格を目指しましょう。';
+  }
+  if (goals.has('study-abroad')) {
+    return '留学先で困らない英語力は、出発前の3〜6ヶ月の集中学習で大きく変わります。今すぐ準備を始めましょう。';
+  }
+  if (goals.has('travel')) {
+    return '旅がもっと楽しくなる英語力は、実は短期間で身につきます。次の旅行までに間に合わせましょう！';
+  }
+  if (goals.has('ai-app-failed')) {
+    return 'アプリで続かなかった理由は意志の弱さではありません。対面なら、講師と一緒だから続けられます。';
+  }
+  return '今のレベルをベースに、あなたの目標へ最短距離で進めるコースをご用意しています。';
+}
+
 function skillAdvice(scores) {
   const advice = [];
   const skillNames = { listening: 'リスニング', reading: 'リーディング', speaking: 'スピーキング', writing: 'ライティング' };
@@ -816,46 +847,47 @@ function showResult() {
   const course       = getRecommendedCourse(state.goals);
   const hasAiAppFail = state.goals.has('ai-app-failed');
 
+  const personalMsg = goalPersonalMessage(state.goals, levelJapanese);
+
   // Build result HTML
   let html = '';
 
-  // Top section
+  // ── 1. 診断完了ヘッダー ──────────────────────────────
   html += '<div class="result-top">';
   html += '  <div class="result-celebration"><span class="material-icons">celebration</span></div>';
   html += '  <h2>診断完了！</h2>';
+  html += '  <p class="result-top-sub">あなたの英語レベルが明らかになりました</p>';
   html += '</div>';
 
-  // Result ID card
-  html += '<div class="result-id-card">';
-  html += '  <p class="result-id-label">診断結果ID <small>スタッフが事前に確認します</small></p>';
-  html += '  <div class="result-id-value">' + escapeHtml(resultId) + '</div>';
-  html += '  <button class="btn-copy" id="copy-result-id"><span class="material-icons">content_copy</span> コピー</button>';
-  html += '</div>';
-
-  // Level card
-  html += '<div class="level-card-result">';
-  html += '  <div class="level-badge">';
-  html += '    <div class="level-badge-stars">' + stars + '</div>';
-  html += '    <div class="level-badge-name">' + escapeHtml(levelJapanese) + '</div>';
-  html += '    <div class="level-badge-en">' + escapeHtml(levelEnglish) + '</div>';
+  // ── 2. レベル発表（感情的クライマックス）────────────────
+  html += '<div class="level-reveal-card">';
+  html += '  <div class="level-reveal-badge">';
+  html += '    <div class="level-reveal-stars">' + stars + '</div>';
+  html += '    <div class="level-reveal-label">あなたのレベル</div>';
+  html += '    <div class="level-reveal-name">' + escapeHtml(levelJapanese) + '</div>';
+  html += '    <div class="level-reveal-en">' + escapeHtml(levelEnglish) + '</div>';
   html += '  </div>';
-  html += '  <div class="level-score">総合スコア: ' + totalCorrect + ' / ' + totalQ + '問正解</div>';
-  html += '  <p class="level-message">' + escapeHtml(motivationalMessage(levelJapanese)) + '</p>';
+  html += '  <div class="level-reveal-score">' + totalCorrect + ' <span>/ ' + totalQ + '問正解</span></div>';
+  html += '  <p class="level-reveal-message">' + escapeHtml(motivationalMessage(levelJapanese)) + '</p>';
   html += '</div>';
 
-  // Skill scores (auto / advanced)
-  if (state.method === 'auto' || state.level === 'advanced') {
-    html += '<div class="skill-scores-card">';
-    html += '  <h3>4技能スコア</h3>';
-    html += '  <div class="skill-bar-list">';
+  // ── 3. 目標連動パーソナライズメッセージ ──────────────
+  html += '<div class="personal-msg-card">';
+  html += '  <div class="personal-msg-icon"><span class="material-icons">tips_and_updates</span></div>';
+  html += '  <p>' + escapeHtml(personalMsg) + '</p>';
+  html += '</div>';
 
+  // ── 4. 4技能スコア（自動 or 上級のみ）────────────────
+  if (state.method === 'auto' || state.level === 'advanced') {
     const skillConfig = [
       { id: 'listening', label: 'リスニング', fillClass: 'fill-listening' },
       { id: 'reading',   label: 'リーディング', fillClass: 'fill-reading' },
       { id: 'speaking',  label: 'スピーキング', fillClass: 'fill-speaking' },
       { id: 'writing',   label: 'ライティング', fillClass: 'fill-writing' }
     ];
-
+    html += '<div class="skill-scores-card">';
+    html += '  <h3>4技能スコア</h3>';
+    html += '  <div class="skill-bar-list">';
     skillConfig.forEach(function(sc) {
       const correct = scores[sc.id];
       const pct     = Math.round((correct / 5) * 100);
@@ -867,11 +899,10 @@ function showResult() {
       html += '  <div class="skill-bar-score">' + correct + '/5</div>';
       html += '</div>';
     });
-
     html += '  </div>';
     html += '</div>';
 
-    // Certification card
+    // レベル認定
     html += '<div class="certification-card">';
     html += '  <h3>推定レベル認定</h3>';
     html += '  <table class="cert-table">';
@@ -882,9 +913,9 @@ function showResult() {
     html += '</div>';
   }
 
-  // Advice
+  // ── 5. アドバイス ────────────────────────────────────
   html += '<div class="advice-card">';
-  html += '  <h3>アドバイス</h3>';
+  html += '  <h3>弱点と伸ばし方</h3>';
   html += '  <div class="advice-list">';
   advice.forEach(function(item) {
     html += '  <div class="advice-item">';
@@ -895,17 +926,35 @@ function showResult() {
   html += '  </div>';
   html += '</div>';
 
-  // AI app failed message
+  // ── 6. AIアプリ挫折者へのメッセージ（条件付き）─────
   if (hasAiAppFail) {
     html += '<div class="ai-message-card">';
-    html += '  <h3><span class="material-icons" style="vertical-align:middle;margin-right:6px;font-size:20px;">info</span>アプリが続かなかったあなたへ</h3>';
-    html += '  <p>英語アプリは手軽な反面、一人では継続が難しく、「実際に話せない」という課題が残りがちです。対面レッスンでは、プロ講師がリアルタイムで発音・表現を修正し、あなたのモチベーションに合わせた学習計画を一緒に立てます。まずは無料体験で違いを実感してください。</p>';
+    html += '  <div class="ai-message-header"><span class="material-icons">psychology</span>アプリが続かなかったあなたへ</div>';
+    html += '  <div class="ai-vs-grid">';
+    html += '    <div class="ai-vs-col ai-vs-app">';
+    html += '      <div class="ai-vs-label">アプリ学習</div>';
+    html += '      <ul>';
+    html += '        <li><span class="material-icons">close</span>一人だからモチベが続かない</li>';
+    html += '        <li><span class="material-icons">close</span>発音の誤りを指摘されない</li>';
+    html += '        <li><span class="material-icons">close</span>実際に話せる感覚がない</li>';
+    html += '      </ul>';
+    html += '    </div>';
+    html += '    <div class="ai-vs-col ai-vs-live">';
+    html += '      <div class="ai-vs-label">対面レッスン</div>';
+    html += '      <ul>';
+    html += '        <li><span class="material-icons">check</span>講師が毎回モチベート</li>';
+    html += '        <li><span class="material-icons">check</span>発音をその場で修正</li>';
+    html += '        <li><span class="material-icons">check</span>話せる実感が積み重なる</li>';
+    html += '      </ul>';
+    html += '    </div>';
+    html += '  </div>';
+    html += '  <p class="ai-message-note">継続率：アプリ <strong>20%</strong> → 対面 <strong>85%</strong></p>';
     html += '</div>';
   }
 
-  // Course recommendation
+  // ── 7. おすすめコース ─────────────────────────────────
   html += '<div class="course-card-result">';
-  html += '  <h3>おすすめコース</h3>';
+  html += '  <h3>あなたにおすすめのコース</h3>';
   html += '  <div class="course-header">';
   html += '    <div class="course-icon"><span class="material-icons">' + escapeHtml(course.icon) + '</span></div>';
   html += '    <div>';
@@ -916,18 +965,31 @@ function showResult() {
   html += '  <p class="course-desc">' + escapeHtml(course.desc) + '</p>';
   html += '</div>';
 
-  // CTA
+  // ── 8. メインCTA（最重要・感情が最高潮の場所）───────
   html += '<div class="result-cta">';
-  html += '  <h3>無料体験レッスン・カウンセリング</h3>';
-  html += '  <p>診断結果をもとにぴったりのコースをご提案します</p>';
-  html += '  <div class="cta-benefits">';
-  html += '    <span><span class="material-icons">check</span> 無料体験レッスン（40分）</span>';
-  html += '    <span><span class="material-icons">check</span> 無料カウンセリング（30分）</span>';
-  html += '    <span><span class="material-icons">check</span> 診断結果IDで来校もスムーズ</span>';
+  html += '  <div class="result-cta-headline">次のステップへ進みましょう</div>';
+  html += '  <p class="result-cta-sub">診断結果をもとに、スタッフがぴったりのコースをご提案します。<br>無料なので、まずは話を聞くだけでも大丈夫です。</p>';
+  html += '  <div class="cta-trust-row">';
+  html += '    <span><span class="material-icons">check_circle</span>完全無料</span>';
+  html += '    <span><span class="material-icons">check_circle</span>勧誘なし</span>';
+  html += '    <span><span class="material-icons">check_circle</span>入会は任意</span>';
   html += '  </div>';
-  html += '  <button class="btn-primary btn-block" id="result-trial-btn">無料体験レッスンを予約する</button>';
-  html += '  <button class="btn-primary btn-block btn-secondary-style" id="result-counseling-btn">無料カウンセリングを予約する</button>';
+  html += '  <button class="btn-primary btn-block btn-cta-main" id="result-trial-btn">';
+  html += '    <span class="material-icons">event_available</span>';
+  html += '    無料体験レッスンを予約する（40分）';
+  html += '  </button>';
+  html += '  <button class="btn-primary btn-block btn-secondary-style" id="result-counseling-btn">';
+  html += '    <span class="material-icons">forum</span>';
+  html += '    無料カウンセリングを予約する（30分）';
+  html += '  </button>';
   html += '  <button class="btn-text" id="result-contact-btn">その他のお問い合わせ</button>';
+  html += '</div>';
+
+  // ── 9. 診断結果ID（下部・参照用）────────────────────
+  html += '<div class="result-id-card">';
+  html += '  <p class="result-id-label">診断結果ID <small>スタッフが事前に確認します</small></p>';
+  html += '  <div class="result-id-value">' + escapeHtml(resultId) + '</div>';
+  html += '  <button class="btn-copy" id="copy-result-id"><span class="material-icons">content_copy</span> コピー</button>';
   html += '</div>';
 
   const resultContent = document.getElementById('result-content');
